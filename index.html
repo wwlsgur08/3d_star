@@ -2,10 +2,19 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>Aster Project</title>
     <style>
-        body { margin: 0; overflow: hidden; font-family: sans-serif; }
-        canvas { display: block; }
+        body { 
+            margin: 0; 
+            overflow: hidden; 
+            font-family: sans-serif; 
+            touch-action: pan-x pan-y; /* 줌과 회전 제스처 비활성화, 패닝만 허용 */
+        }
+        canvas { 
+            display: block; 
+            touch-action: none; /* 캔버스에서 모든 터치 제스처 비활성화 */
+        }
         /* 마우스 호버 시 나타날 툴팁 스타일 */
         #tooltip {
             position: absolute;

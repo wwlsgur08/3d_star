@@ -552,14 +552,23 @@ window.addEventListener('mousedown', onUserInteraction);
 window.addEventListener('wheel', onUserInteraction);
 window.addEventListener('touchstart', onUserInteraction);
 
-window.addEventListener('dblclick', (event) => {
-    onUserInteraction(); // 더블클릭도 상호작용으로 간주
-    // 더블클릭 시점의 마우스 위치로 ray casting (원래 방식)
-    const clickMouse = new THREE.Vector2();
-    clickMouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-    clickMouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-    
-    raycaster.setFromCamera(clickMouse, camera);
+// 모바일 더블탭 감지를 위한 변수들
+let lastTouchTime = 0;
+let lastTouchPosition = { x: 0, y: 0 };
+const DOUBLE_TAP_DELAY = 300; // 300ms 내 두 번 터치
+const TOUCH_TOLERANCE = 50; // 50px 허용 오차
+
+// 터치 좌표 정규화 함수
+function getNormalizedCoordinates(clientX, clientY) {
+    return {
+        x: (clientX / window.innerWidth) * 2 - 1,
+        y: -(clientY / window.innerHeight) * 2 + 1
+    };
+}
+
+// 별 상세보기 실행 함수 (공통)
+function showStarDetail(normalizedCoords) {
+    raycaster.setFromCamera(new THREE.Vector2(normalizedCoords.x, normalizedCoords.y), camera);
     const intersects = raycaster.intersectObjects(stars);
     
     if (intersects.length > 0) {
@@ -597,7 +606,67 @@ window.addEventListener('dblclick', (event) => {
                 detailPanel.style.display = 'block';
             }
         });
+        return true; // 별 클릭 성공
     }
+    return false; // 별 클릭 실패
+}
+
+// 데스크톱 더블클릭 처리
+window.addEventListener('dblclick', (event) => {
+    onUserInteraction();
+    const coords = getNormalizedCoordinates(event.clientX, event.clientY);
+    showStarDetail(coords);
+});
+
+// 모바일 터치 더블탭 처리
+window.addEventListener('touchend', (event) => {
+    // 터치 이벤트가 있을 때만 기본 동작 방지
+    if (event.changedTouches && event.changedTouches.length > 0) {
+        event.preventDefault(); // 기본 줌 동작 방지
+        
+        const currentTime = Date.now();
+        const touch = event.changedTouches[0];
+        const currentPosition = { x: touch.clientX, y: touch.clientY };
+        
+        // 더블탭 조건 체크
+        const timeDiff = currentTime - lastTouchTime;
+        const distance = Math.sqrt(
+            Math.pow(currentPosition.x - lastTouchPosition.x, 2) + 
+            Math.pow(currentPosition.y - lastTouchPosition.y, 2)
+        );
+        
+        if (timeDiff < DOUBLE_TAP_DELAY && distance < TOUCH_TOLERANCE) {
+            // 더블탭 감지!
+            onUserInteraction();
+            const coords = getNormalizedCoordinates(touch.clientX, touch.clientY);
+            const success = showStarDetail(coords);
+            
+            if (success) {
+                console.log('📱 모바일 더블탭으로 별 상세보기 실행');
+            }
+            
+            // 더블탭 처리 후 초기화
+            lastTouchTime = 0;
+            lastTouchPosition = { x: 0, y: 0 };
+        } else {
+            // 첫 번째 탭 또는 조건 불일치
+            lastTouchTime = currentTime;
+            lastTouchPosition = currentPosition;
+        }
+    }
+});
+
+// 추가적인 모바일 제스처 방지
+document.addEventListener('gesturestart', function(e) {
+    e.preventDefault();
+});
+
+document.addEventListener('gesturechange', function(e) {
+    e.preventDefault();
+});
+
+document.addEventListener('gestureend', function(e) {
+    e.preventDefault();
 });
 
 document.getElementById('close-btn').addEventListener('click', () => {
