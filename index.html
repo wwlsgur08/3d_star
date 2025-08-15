@@ -424,6 +424,48 @@
             min-width: 200px;
         }
         
+        /* 도움말 패널 닫기 버튼 */
+        #help-close-btn {
+            position: absolute;
+            top: 8px;
+            right: 12px;
+            cursor: pointer;
+            font-size: 18px;
+            color: #999;
+            transition: color 0.2s;
+            padding: 2px 4px;
+            display: none; /* 데스크톱에서는 숨김 */
+        }
+        
+        #help-close-btn:hover {
+            color: #fff;
+        }
+        
+        /* i 아이콘 버튼 (도움말 열기용) */
+        #help-toggle-btn {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            width: 40px;
+            height: 40px;
+            background-color: rgba(25, 25, 25, 0.9);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+            z-index: 499;
+            display: none; /* 초기에는 숨김 */
+            transition: all 0.3s ease;
+        }
+        
+        #help-toggle-btn:hover {
+            background-color: rgba(25, 25, 25, 1);
+            transform: scale(1.1);
+        }
+        
         /* 모바일 도움말 패널 최적화 */
         @media screen and (max-width: 480px) {
             #help-panel {
@@ -434,6 +476,21 @@
                 min-width: 160px;
                 border-radius: 8px;
             }
+            
+            #help-close-btn {
+                display: block; /* 모바일에서만 표시 */
+                top: 5px;
+                right: 8px;
+                font-size: 16px;
+            }
+            
+            #help-toggle-btn {
+                top: 10px;
+                right: 10px;
+                width: 35px;
+                height: 35px;
+                font-size: 16px;
+            }
         }
         
         @media screen and (max-width: 360px) {
@@ -443,6 +500,20 @@
                 padding: 8px;
                 font-size: 11px;
                 min-width: 140px;
+            }
+            
+            #help-close-btn {
+                top: 4px;
+                right: 6px;
+                font-size: 14px;
+            }
+            
+            #help-toggle-btn {
+                top: 8px;
+                right: 8px;
+                width: 32px;
+                height: 32px;
+                font-size: 15px;
             }
         }
         
@@ -534,6 +605,7 @@
     
     <!-- 도움말 패널 -->
     <div id="help-panel">
+        <div id="help-close-btn">×</div>
         <h3>🎮 조작법</h3>
         <div class="help-item">
             <span class="help-key">마우스 드래그</span>
@@ -556,6 +628,9 @@
             <span class="help-desc">창 닫기</span>
         </div>
     </div>
+
+    <!-- i 아이콘 버튼 (도움말 열기용) -->
+    <button id="help-toggle-btn">ⓘ</button>
 
     <!-- 테스트 별 삭제 버튼 -->
     <button id="clear-test-btn" onclick="clearTestStars()">🗑️ 테스트 별 삭제</button>

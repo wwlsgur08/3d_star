@@ -11,17 +11,89 @@ let currentHalo = null; // 현재 후광 객체
 window.startExploration = function() {
     const introOverlay = document.getElementById('intro-overlay');
     const helpPanel = document.getElementById('help-panel');
+    const helpToggleBtn = document.getElementById('help-toggle-btn');
     
     introOverlay.classList.add('fade-out');
     
     // 1초 후 완전히 제거하고 도움말 패널 표시
     setTimeout(() => {
         introOverlay.style.display = 'none';
-        helpPanel.style.display = 'block'; // 도움말 패널 표시
+        
+        // 모바일 체크
+        const isMobile = window.innerWidth <= 480;
+        
+        if (isMobile) {
+            // 모바일: i 아이콘만 표시하고 도움말은 숨김
+            helpToggleBtn.style.display = 'block';
+            helpPanel.style.display = 'none';
+        } else {
+            // 데스크톱: 도움말 패널 표시
+            helpPanel.style.display = 'block';
+            helpToggleBtn.style.display = 'none';
+        }
+        
+        // 도움말 토글 기능 초기화
+        initHelpToggle();
     }, 1000);
     
     console.log('🚀 탐험 시작! 인트로 화면 제거 + 도움말 표시');
 };
+
+// 도움말 토글 기능 초기화
+function initHelpToggle() {
+    const helpPanel = document.getElementById('help-panel');
+    const helpToggleBtn = document.getElementById('help-toggle-btn');
+    const helpCloseBtn = document.getElementById('help-close-btn');
+    
+    // i 아이콘 클릭시 도움말 표시
+    helpToggleBtn.addEventListener('click', function() {
+        helpPanel.style.display = 'block';
+        helpToggleBtn.style.display = 'none';
+        console.log('ℹ️ 도움말 패널 열기');
+    });
+    
+    // 터치 이벤트도 추가
+    helpToggleBtn.addEventListener('touchend', function(e) {
+        e.preventDefault();
+        helpPanel.style.display = 'block';
+        helpToggleBtn.style.display = 'none';
+        console.log('📱 터치로 도움말 패널 열기');
+    });
+    
+    // X 버튼 클릭시 도움말 숨김
+    helpCloseBtn.addEventListener('click', function() {
+        helpPanel.style.display = 'none';
+        helpToggleBtn.style.display = 'block';
+        console.log('✖️ 도움말 패널 닫기');
+    });
+    
+    // X 버튼 터치 이벤트도 추가
+    helpCloseBtn.addEventListener('touchend', function(e) {
+        e.preventDefault();
+        helpPanel.style.display = 'none';
+        helpToggleBtn.style.display = 'block';
+        console.log('📱 터치로 도움말 패널 닫기');
+    });
+}
+
+// 화면 크기 변경시 도움말 표시 방식 조정
+window.addEventListener('resize', function() {
+    const helpPanel = document.getElementById('help-panel');
+    const helpToggleBtn = document.getElementById('help-toggle-btn');
+    const isMobile = window.innerWidth <= 480;
+    
+    if (isMobile) {
+        // 모바일 모드: 도움말이 열려있지 않다면 i 아이콘만 표시
+        if (helpPanel.style.display === 'none' || !helpPanel.style.display) {
+            helpToggleBtn.style.display = 'block';
+            helpPanel.style.display = 'none';
+        }
+    } else {
+        // 데스크톱 모드: 도움말 패널 표시, i 아이콘 숨김
+        helpPanel.style.display = 'block';
+        helpToggleBtn.style.display = 'none';
+    }
+});
 
 
 // clearTestStars를 전역 함수로 만들기
