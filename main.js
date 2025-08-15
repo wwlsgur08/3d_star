@@ -748,7 +748,8 @@ document.addEventListener('gestureend', function(e) {
     e.preventDefault();
 });
 
-document.getElementById('close-btn').addEventListener('click', () => {
+// 별 상세보기 패널 닫기 함수 (공통)
+function closeDetailPanel() {
     detailPanel.style.display = 'none';
 
     // 항상 초기 중앙 시점으로 돌아가기
@@ -773,6 +774,37 @@ document.getElementById('close-btn').addEventListener('click', () => {
             controls.enabled = true;
         }
     });
+}
+
+// 데스크톱 클릭 이벤트
+document.getElementById('close-btn').addEventListener('click', (e) => {
+    e.preventDefault();
+    closeDetailPanel();
+    console.log('🖱️ 데스크톱 클릭으로 상세보기 닫기');
+});
+
+// 모바일 터치 이벤트
+document.getElementById('close-btn').addEventListener('touchend', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    closeDetailPanel();
+    console.log('📱 모바일 터치로 상세보기 닫기');
+});
+
+// 터치 시작시 피드백
+document.getElementById('close-btn').addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    const closeBtn = document.getElementById('close-btn');
+    closeBtn.style.transform = 'scale(0.9)';
+    closeBtn.style.color = '#fff';
+});
+
+// 터치 취소시 원래대로
+document.getElementById('close-btn').addEventListener('touchcancel', (e) => {
+    e.preventDefault();
+    const closeBtn = document.getElementById('close-btn');
+    closeBtn.style.transform = 'scale(1)';
+    closeBtn.style.color = '#999';
 });
 
 // -- 애니메이션 루프 (수정) --
