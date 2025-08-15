@@ -23,6 +23,40 @@ window.startExploration = function() {
     console.log('🚀 탐험 시작! 인트로 화면 제거 + 도움말 표시');
 };
 
+// 탐험 버튼 이벤트 리스너 추가 (모바일 호환)
+document.addEventListener('DOMContentLoaded', function() {
+    const introButton = document.getElementById('intro-button');
+    
+    if (introButton) {
+        // 마우스 클릭 (데스크톱)
+        introButton.addEventListener('click', function(e) {
+            e.preventDefault();
+            startExploration();
+            console.log('🖱️ 데스크톱 클릭으로 탐험 시작');
+        });
+        
+        // 터치 이벤트 (모바일)
+        introButton.addEventListener('touchend', function(e) {
+            e.preventDefault();
+            e.stopPropagation(); // 이벤트 버블링 방지
+            startExploration();
+            console.log('📱 모바일 터치로 탐험 시작');
+        });
+        
+        // 터치 시작시 피드백
+        introButton.addEventListener('touchstart', function(e) {
+            e.preventDefault();
+            introButton.style.transform = 'scale(0.95)';
+        });
+        
+        // 터치 취소시 원래대로
+        introButton.addEventListener('touchcancel', function(e) {
+            e.preventDefault();
+            introButton.style.transform = 'scale(1)';
+        });
+    }
+});
+
 // clearTestStars를 전역 함수로 만들기
 window.clearTestStars = function() {
     const testStars = stars.filter(star => star.userData.isNewStar);
@@ -618,14 +652,21 @@ window.addEventListener('dblclick', (event) => {
     showStarDetail(coords);
 });
 
-// 모바일 터치 더블탭 처리
+// 모바일 터치 더블탭 처리 (버튼 영역 제외)
 window.addEventListener('touchend', (event) => {
     // 터치 이벤트가 있을 때만 기본 동작 방지
     if (event.changedTouches && event.changedTouches.length > 0) {
+        const touch = event.changedTouches[0];
+        const target = document.elementFromPoint(touch.clientX, touch.clientY);
+        
+        // 인트로 버튼이나 다른 UI 요소는 제외
+        if (target && (target.id === 'intro-button' || target.closest('#intro-overlay'))) {
+            return; // 버튼 영역은 더블탭 처리 안함
+        }
+        
         event.preventDefault(); // 기본 줌 동작 방지
         
         const currentTime = Date.now();
-        const touch = event.changedTouches[0];
         const currentPosition = { x: touch.clientX, y: touch.clientY };
         
         // 더블탭 조건 체크
