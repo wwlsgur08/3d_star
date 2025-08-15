@@ -168,26 +168,66 @@
         }
         
         #intro-logo {
-            width: 250px; /* 조금 더 크게 */
+            width: 200px;
             height: auto;
-            margin-bottom: 25px;
+            margin-bottom: 20px;
             animation: fadeInUp 1.5s ease-out;
+            max-width: 80vw; /* 화면 너비의 80% 제한 */
         }
         
         #intro-title {
-            width: 380px; /* 조금 더 크게 */
+            width: 300px;
             height: auto;
-            margin-bottom: 35px;
+            margin-bottom: 30px;
             animation: fadeInUp 1.8s ease-out;
+            max-width: 85vw; /* 화면 너비의 85% 제한 */
         }
         
         #intro-button {
-            width: 220px; /* 조금 더 크게 */
+            width: 180px;
             height: auto;
             cursor: pointer;
             transition: transform 0.3s ease;
             animation: fadeInUp 2.1s ease-out;
             pointer-events: auto; /* 버튼만 클릭 가능 */
+            max-width: 70vw; /* 화면 너비의 70% 제한 */
+            min-height: 44px; /* 터치 영역 최소 크기 보장 */
+        }
+        
+        /* 모바일 세로 모드 최적화 */
+        @media screen and (max-width: 480px) {
+            #intro-logo {
+                width: 160px;
+                margin-bottom: 15px;
+            }
+            
+            #intro-title {
+                width: 240px;
+                margin-bottom: 20px;
+            }
+            
+            #intro-button {
+                width: 150px;
+                min-height: 48px; /* 모바일 터치 권장 크기 */
+            }
+        }
+        
+        /* 아주 작은 화면 대응 */
+        @media screen and (max-width: 360px) {
+            #intro-logo {
+                width: 140px;
+                margin-bottom: 12px;
+            }
+            
+            #intro-title {
+                width: 200px;
+                margin-bottom: 15px;
+            }
+            
+            #intro-button {
+                width: 130px;
+                min-height: 50px;
+            }
         }
         
         #intro-button.spinning {
