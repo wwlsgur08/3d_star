@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>🧪 별자리 송신기 테스트</title>
+    <style>
+        body { 
+            font-family: sans-serif; 
+            padding: 20px; 
+            background: #1a1a1a; 
+            color: white; 
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .section {
+            background: rgba(40, 40, 40, 0.8);
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+        button {
+            background: #6c5ce7;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+            font-size: 16px;
+        }
+        button:hover { background: #5a4fcf; }
+        button:disabled { 
+            background: #555; 
+            cursor: not-allowed; 
+        }
+        .charm-input {
+            display: flex;
+            align-items: center;
+            margin: 10px 0;
+        }
+        .charm-input label {
+            display: inline-block;
+            width: 120px;
+            font-weight: bold;
+        }
+        .charm-input input {
+            width: 60px;
+            padding: 8px;
+            background: #333;
+            color: white;
+            border: 1px solid #555;
+            border-radius: 3px;
+            margin-left: 10px;
+        }
+        .status {
+            padding: 15px;
+            border-radius: 8px;
+            margin: 10px 0;
+            font-weight: bold;
+        }
+        .status.connected {
+            background: rgba(46, 204, 113, 0.2);
+            border: 1px solid #2ecc71;
+            color: #2ecc71;
+        }
+        .status.disconnected {
+            background: rgba(231, 76, 60, 0.2);
+            border: 1px solid #e74c3c;
+            color: #e74c3c;
+        }
+        .log {
+            background: #000;
+            color: #0f0;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: monospace;
+            height: 200px;
+            overflow-y: scroll;
+            white-space: pre-wrap;
+        }
+        .result {
+            background: rgba(25, 25, 25, 0.9);
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 별자리 송신기 테스트</h1>
+        <p>별자리 생성기를 시뮬레이션해서 WebSocket 서버로 데이터를 전송합니다.</p>
+        
+        <div class="section">
+            <h3>🔌 서버 연결 상태</h3>
+            <div id="connection-status" class="status disconnected">
+                ❌ 서버에 연결되지 않음
+            </div>
+            <button onclick="connectToServer()">서버 연결</button>
+            <button onclick="disconnectFromServer()">연결 해제</button>
+        </div>
+
+        <div class="section">
+            <h3>⚙️ 매력 점수 설정</h3>
+            <div class="charm-input">
+                <label>창의성:</label>
+                <input type="number" id="창의성" min="1" max="6" value="6">
+            </div>
+            <div class="charm-input">
+                <label>열정:</label>
+                <input type="number" id="열정" min="1" max="6" value="6">
+            </div>
+            <div class="charm-input">
+                <label>호기심:</label>
+                <input type="number" id="호기심" min="1" max="6" value="5">
+            </div>
+            <div class="charm-input">
+                <label>모험심:</label>
+                <input type="number" id="모험심" min="1" max="6" value="4">
+            </div>
+            <div class="charm-input">
+                <label>리더십:</label>
+                <input type="number" id="리더십" min="1" max="6" value="3">
+            </div>
+            <div class="charm-input">
+                <label>공감 능력:</label>
+                <input type="number" id="공감 능력" min="1" max="6" value="3">
+            </div>
+        </div>
+
+        <div class="section">
+            <h3>🚀 별자리 전송</h3>
+            <button onclick="sendConstellation()" id="send-btn" disabled>
+                🌟 우주로 별자리 보내기!
+            </button>
+            <button onclick="sendRandomConstellation()">
+                🎲 랜덤 별자리 보내기
+            </button>
+            <button onclick="sendMultipleStars()">
+                🌟✨⭐ 여러 개 보내기 (5개)
+            </button>
+        </div>
+
+        <div class="section">
+            <h3>📋 전송 결과</h3>
+            <div id="results"></div>
+        </div>
+
+        <div class="section">
+            <h3>📡 서버 로그</h3>
+            <div id="log" class="log">서버에 연결하면 로그가 표시됩니다...</div>
+        </div>
+    </div>
+
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script>
+        let socket = null;
+        let isConnected = false;
+
+        function log(message) {
+            const logElement = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            logElement.textContent += `[${timestamp}] ${message}\n`;
+            logElement.scrollTop = logElement.scrollHeight;
+        }
+
+        function updateConnectionStatus(connected) {
+            const statusElement = document.getElementById('connection-status');
+            const sendBtn = document.getElementById('send-btn');
+            
+            isConnected = connected;
+            
+            if (connected) {
+                statusElement.className = 'status connected';
+                statusElement.textContent = '✅ 서버에 연결됨';
+                sendBtn.disabled = false;
+            } else {
+                statusElement.className = 'status disconnected';  
+                statusElement.textContent = '❌ 서버에 연결되지 않음';
+                sendBtn.disabled = true;
+            }
+        }
+
+        function connectToServer() {
+            if (socket) {
+                socket.disconnect();
+            }
+
+            log('서버 연결 시도 중...');
+            socket = io('http://localhost:3333');
+
+            socket.on('connect', () => {
+                log('✅ 서버 연결 성공!');
+                updateConnectionStatus(true);
+            });
+
+            socket.on('disconnect', () => {
+                log('❌ 서버 연결 끊어짐');
+                updateConnectionStatus(false);
+            });
+
+            socket.on('constellation-created', (response) => {
+                log(`🌟 별자리 생성 완료: ${JSON.stringify(response, null, 2)}`);
+                
+                if (response.success) {
+                    displayResult(response.star, true);
+                } else {
+                    displayResult({ error: response.message }, false);
+                }
+            });
+
+            socket.on('new-star-added', (star) => {
+                log(`⭐ 새로운 별이 우주에 추가됨: "${star.name}"`);
+            });
+        }
+
+        function disconnectFromServer() {
+            if (socket) {
+                socket.disconnect();
+                socket = null;
+                updateConnectionStatus(false);
+                log('연결 해제됨');
+            }
+        }
+
+        function getCharmScores() {
+            const charms = ['창의성', '열정', '호기심', '모험심', '리더십', '공감 능력'];
+            const scores = {};
+            
+            charms.forEach(charm => {
+                const value = parseInt(document.getElementById(charm).value);
+                if (value > 0) scores[charm] = value;
+            });
+            
+            return scores;
+        }
+
+        function sendConstellation() {
+            if (!isConnected) {
+                alert('서버에 먼저 연결해주세요!');
+                return;
+            }
+
+            const charmScores = getCharmScores();
+            log(`🚀 별자리 전송: ${JSON.stringify(charmScores)}`);
+            
+            socket.emit('create-constellation', {
+                charmScores: charmScores,
+                imageData: null // 테스트용이므로 이미지는 생략
+            });
+        }
+
+        function sendRandomConstellation() {
+            if (!isConnected) {
+                alert('서버에 먼저 연결해주세요!');
+                return;
+            }
+
+            // 랜덤 매력 점수 생성
+            const charms = ['창의성', '열정', '책임감', '성실함', '공감 능력', '리더십', '모험심', '야망', '통찰력', '진정성'];
+            const selectedCharms = charms.sort(() => 0.5 - Math.random()).slice(0, 6);
+            const randomScores = {};
+            
+            selectedCharms.forEach(charm => {
+                randomScores[charm] = Math.floor(Math.random() * 6) + 1;
+            });
+
+            log(`🎲 랜덤 별자리 전송: ${JSON.stringify(randomScores)}`);
+            
+            socket.emit('create-constellation', {
+                charmScores: randomScores,
+                imageData: null
+            });
+        }
+
+        function sendMultipleStars() {
+            if (!isConnected) {
+                alert('서버에 먼저 연결해주세요!');
+                return;
+            }
+
+            log('🌟✨⭐ 5개의 별자리를 순차적으로 전송합니다...');
+            
+            for (let i = 0; i < 5; i++) {
+                setTimeout(() => {
+                    sendRandomConstellation();
+                }, i * 1000); // 1초 간격으로 전송
+            }
+        }
+
+        function displayResult(star, success) {
+            const resultsDiv = document.getElementById('results');
+            
+            if (success) {
+                const resultHTML = `
+                    <div class="result" style="border-left: 4px solid #2ecc71;">
+                        <h4>✅ ${star.name}</h4>
+                        <p><strong>설명:</strong> ${star.simpleDescription}</p>
+                        <p><strong>매력 점수:</strong><br>${star.charms.join('<br>')}</p>
+                        <p><strong>ID:</strong> ${star.id} | <strong>시간:</strong> ${new Date(star.timestamp).toLocaleString()}</p>
+                    </div>
+                `;
+                resultsDiv.innerHTML = resultHTML + resultsDiv.innerHTML;
+            } else {
+                const resultHTML = `
+                    <div class="result" style="border-left: 4px solid #e74c3c;">
+                        <h4>❌ 전송 실패</h4>
+                        <p>${star.error}</p>
+                    </div>
+                `;
+                resultsDiv.innerHTML = resultHTML + resultsDiv.innerHTML;
+            }
+        }
+
+        // 페이지 로드 시 자동 연결 시도
+        window.addEventListener('load', () => {
+            setTimeout(connectToServer, 1000);
+        });
+    </script>
+</body>
+</html>

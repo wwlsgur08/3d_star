@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>별자리 생성기 테스트</title>
+    <style>
+        body { 
+            font-family: sans-serif; 
+            padding: 20px; 
+            background: #1a1a1a; 
+            color: white; 
+        }
+        .test-area {
+            background: rgba(40, 40, 40, 0.8);
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+        button {
+            background: #6c5ce7;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background: #5a4fcf; }
+        .result {
+            background: rgba(25, 25, 25, 0.9);
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+        }
+        .charm-input {
+            margin: 10px 0;
+        }
+        .charm-input label {
+            display: inline-block;
+            width: 120px;
+        }
+        .charm-input input {
+            width: 50px;
+            padding: 5px;
+            background: #333;
+            color: white;
+            border: 1px solid #555;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🤖 별자리 AI 생성기 테스트</h1>
+    
+    <div class="test-area">
+        <h3>매력 점수 입력</h3>
+        <div class="charm-input">
+            <label>창의성:</label>
+            <input type="number" id="창의성" min="1" max="6" value="6">
+        </div>
+        <div class="charm-input">
+            <label>열정:</label>
+            <input type="number" id="열정" min="1" max="6" value="6">
+        </div>
+        <div class="charm-input">
+            <label>호기심:</label>
+            <input type="number" id="호기심" min="1" max="6" value="5">
+        </div>
+        <div class="charm-input">
+            <label>모험심:</label>
+            <input type="number" id="모험심" min="1" max="6" value="4">
+        </div>
+        <div class="charm-input">
+            <label>리더십:</label>
+            <input type="number" id="리더십" min="1" max="6" value="3">
+        </div>
+        <div class="charm-input">
+            <label>공감 능력:</label>
+            <input type="number" id="공감 능력" min="1" max="6" value="3">
+        </div>
+        
+        <button onclick="generateStar()">🎭 별자리 자동 생성!</button>
+        <button onclick="generateMultiple()">🎲 여러 개 생성 (랜덤)</button>
+    </div>
+
+    <div id="results"></div>
+
+    <script type="module">
+        import { StarGenerator } from './starGenerator.js';
+        
+        const generator = new StarGenerator();
+        window.generator = generator;
+        
+        window.generateStar = function() {
+            const charmScores = {};
+            ['창의성', '열정', '호기심', '모험심', '리더십', '공감 능력'].forEach(charm => {
+                const value = parseInt(document.getElementById(charm).value);
+                if (value > 0) charmScores[charm] = value;
+            });
+            
+            const result = generator.generateStar(charmScores);
+            displayResult(result, charmScores);
+        };
+        
+        window.generateMultiple = function() {
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '<h3>🎲 랜덤 생성 결과들:</h3>';
+            
+            // 5개의 랜덤 조합 생성
+            for (let i = 0; i < 5; i++) {
+                const randomScores = generateRandomScores();
+                const result = generator.generateStar(randomScores);
+                displayResult(result, randomScores, false);
+            }
+        };
+        
+        function generateRandomScores() {
+            const charms = ['창의성', '열정', '책임감', '성실함', '공감 능력', '리더십', '모험심', '야망', '통찰력', '진정성'];
+            const scores = {};
+            
+            // 랜덤하게 6개 매력 선택하고 점수 부여
+            const selectedCharms = charms.sort(() => 0.5 - Math.random()).slice(0, 6);
+            selectedCharms.forEach(charm => {
+                scores[charm] = Math.floor(Math.random() * 6) + 1;
+            });
+            
+            return scores;
+        }
+        
+        function displayResult(result, originalScores, clear = true) {
+            const resultsDiv = document.getElementById('results');
+            if (clear) resultsDiv.innerHTML = '';
+            
+            const resultHTML = `
+                <div class="result">
+                    <h4>✨ ${result.name}</h4>
+                    <p><strong>설명:</strong> ${result.simpleDescription}</p>
+                    <p><strong>매력 점수:</strong><br>${result.charms.join('<br>')}</p>
+                    <hr style="border-color: #555; margin: 15px 0;">
+                    <details>
+                        <summary>원본 입력 데이터</summary>
+                        <pre>${JSON.stringify(originalScores, null, 2)}</pre>
+                    </details>
+                </div>
+            `;
+            
+            resultsDiv.innerHTML += resultHTML;
+        }
+    </script>
+</body>
+</html>

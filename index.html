@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>Aster Project</title>
+    <style>
+        body { margin: 0; overflow: hidden; font-family: sans-serif; }
+        canvas { display: block; }
+        /* 마우스 호버 시 나타날 툴팁 스타일 */
+        #tooltip {
+            position: absolute;
+            display: none;
+            padding: 10px;
+            background-color: rgba(0, 0, 0, 0.7);
+            color: white;
+            border-radius: 5px;
+            pointer-events: none; /* 마우스 클릭을 방해하지 않도록 */
+        }
+        #tooltip h3 { margin: 0; font-size: 16px; }
+        #tooltip p { margin: 5px 0 0; font-size: 12px; }
+
+        /* 클릭 시 나타날 상세 정보 패널 스타일 */
+        #detail-panel {
+            position: absolute;
+            display: none;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 750px;
+            height: 380px;
+            background-color: rgba(25, 25, 25, 0.95);
+            color: white;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7);
+        }
+        
+        #detail-content {
+            display: flex;
+            height: 100%;
+        }
+        
+        #image-section {
+            flex: 1;
+            padding: 35px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: rgba(40, 40, 40, 0.8);
+        }
+        
+        #detail-panel #constellation-image {
+            width: 340px;
+            height: 270px;
+            object-fit: contain;
+            border-radius: 8px;
+        }
+        
+        #info-section {
+            flex: 1;
+            padding: 35px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+        
+        #detail-panel h2 { 
+            margin: 0 0 8px 0;
+            font-size: 22px;
+            font-weight: bold;
+            color: #fff;
+        }
+        
+        #detail-panel #comment { 
+            font-size: 14px; 
+            line-height: 1.6; 
+            margin: 0 0 12px 0;
+            color: #ddd;
+        }
+        
+        #charms-section {
+            margin-top: 8px;
+        }
+        
+        #charms-label {
+            font-size: 16px;
+            font-weight: bold;
+            margin-bottom: 8px;
+            color: #fff;
+        }
+        
+        #detail-panel #charms { 
+            margin: 0;
+            font-style: normal; 
+            color: #ccc;
+            font-size: 14px;
+            line-height: 1.4;
+        }
+        
+        #close-btn {
+            position: absolute;
+            top: 15px;
+            right: 20px;
+            cursor: pointer;
+            font-size: 24px;
+            color: #999;
+            transition: color 0.2s;
+        }
+        
+        #close-btn:hover {
+            color: #fff;
+        }
+        
+        /* 테스트 별 삭제 버튼 */
+        #clear-test-btn {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            background-color: rgba(231, 76, 60, 0.8);
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+            transition: all 0.3s ease;
+        }
+        
+        #clear-test-btn:hover {
+            background-color: rgba(231, 76, 60, 1);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+        }
+        
+        #clear-test-btn:active {
+            transform: translateY(0);
+        }
+        
+        /* 인트로 화면 스타일 */
+        #intro-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            transition: opacity 1s ease-out;
+            pointer-events: none; /* 배경 3D 인터랙션 방지 */
+        }
+        
+        #intro-overlay.fade-out {
+            opacity: 0;
+        }
+        
+        #intro-logo {
+            width: 250px; /* 조금 더 크게 */
+            height: auto;
+            margin-bottom: 25px;
+            animation: fadeInUp 1.5s ease-out;
+        }
+        
+        #intro-title {
+            width: 380px; /* 조금 더 크게 */
+            height: auto;
+            margin-bottom: 35px;
+            animation: fadeInUp 1.8s ease-out;
+        }
+        
+        #intro-button {
+            width: 220px; /* 조금 더 크게 */
+            height: auto;
+            cursor: pointer;
+            transition: transform 0.3s ease;
+            animation: fadeInUp 2.1s ease-out;
+            pointer-events: auto; /* 버튼만 클릭 가능 */
+        }
+        
+        #intro-button.spinning {
+            animation: spinButton 0.8s ease-out;
+        }
+        
+        #intro-button:hover {
+            transform: scale(1.05);
+        }
+        
+        #intro-button:active {
+            transform: scale(0.98);
+        }
+        
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        @keyframes spinButton {
+            from {
+                transform: rotate(0deg);
+            }
+            to {
+                transform: rotate(720deg); /* 2바퀴 회전 */
+            }
+        }
+        
+        /* 도움말 패널 스타일 */
+        #help-panel {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background-color: rgba(25, 25, 25, 0.9);
+            color: white;
+            border-radius: 10px;
+            padding: 15px;
+            font-size: 14px;
+            font-family: sans-serif;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+            z-index: 500;
+            display: none; /* 초기에는 숨김 */
+            min-width: 200px;
+        }
+        
+        #help-panel h3 {
+            margin: 0 0 10px 0;
+            font-size: 16px;
+            color: #fff;
+            border-bottom: 1px solid #444;
+            padding-bottom: 5px;
+        }
+        
+        #help-panel .help-item {
+            margin-bottom: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        #help-panel .help-key {
+            background-color: rgba(255, 255, 255, 0.1);
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 12px;
+            min-width: 80px;
+            text-align: center;
+        }
+        
+        #help-panel .help-desc {
+            color: #ccc;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <!-- 인트로 화면 오버레이 -->
+    <div id="intro-overlay">
+        <img id="intro-logo" src="logo.png" alt="로고">
+        <img id="intro-title" src="title.png" alt="제목">
+        <img id="intro-button" src="button.png" alt="탐험 떠나기" onclick="startExploration()">
+    </div>
+
+    <div id="tooltip">
+        <h3 id="tooltip-name"></h3>
+        <p id="tooltip-desc"></p>
+    </div>
+    
+    <!-- 도움말 패널 -->
+    <div id="help-panel">
+        <h3>🎮 조작법</h3>
+        <div class="help-item">
+            <span class="help-key">마우스 드래그</span>
+            <span class="help-desc">회전</span>
+        </div>
+        <div class="help-item">
+            <span class="help-key">마우스 휠</span>
+            <span class="help-desc">확대/축소</span>
+        </div>
+        <div class="help-item">
+            <span class="help-key">더블클릭</span>
+            <span class="help-desc">별 상세보기</span>
+        </div>
+        <div class="help-item">
+            <span class="help-key">마우스 오버</span>
+            <span class="help-desc">별 정보</span>
+        </div>
+        <div class="help-item">
+            <span class="help-key">×</span>
+            <span class="help-desc">창 닫기</span>
+        </div>
+    </div>
+
+    <!-- 테스트 별 삭제 버튼 -->
+    <button id="clear-test-btn" onclick="clearTestStars()">🗑️ 테스트 별 삭제</button>
+    <div id="detail-panel">
+        <div id="close-btn">×</div>
+        <div id="detail-content">
+            <div id="image-section">
+                <img id="constellation-image" src="" alt="별자리 이미지">
+            </div>
+            <div id="info-section">
+                <h2 id="detail-name"></h2>
+                <p id="comment"></p>
+                <div id="charms-section">
+                    <div id="charms-label">매력, 매력도</div>
+                    <div id="charms"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.161.0/build/three.module.js",
+                "three/addons/controls/OrbitControls.js": "https://unpkg.com/three@0.161.0/examples/jsm/controls/OrbitControls.js",
+                "gsap": "https://unpkg.com/gsap@3.12.5/index.js"
+            }
+        }
+    </script>
+    <script type="module" src="main.js"></script>
+</body>
+</html>
