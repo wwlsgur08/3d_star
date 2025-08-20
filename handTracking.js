@@ -34,6 +34,11 @@ class HandTrackingManager {
         this.lastPointingTime = null;
         this.pointingDuration = 0;
         
+        // 성능 최적화용 변수들
+        this.frameSkipCounter = 0;
+        this.leftFrameSkipCounter = 0;
+        this.animationPending = false;
+        
         this.init();
     }
     
@@ -152,8 +157,9 @@ class HandTrackingManager {
             this.hands.setOptions({
                 maxNumHands: 2,
                 modelComplexity: 0, // 0으로 낮춤 (더 빠름)
-                minDetectionConfidence: 0.3, // 더 감도 낮춤
-                minTrackingConfidence: 0.2,  // 더 감도 낮춤
+                minDetectionConfidence: 0.5, // 더 높여서 성능 향상
+                minTrackingConfidence: 0.3,  // 더 높여서 성능 향상
+                staticImageMode: false,      // 비디오 모드 최적화
             });
             
             this.hands.onResults(this.onResults.bind(this));
@@ -340,21 +346,25 @@ class HandTrackingManager {
         }
     }
 
-    // 오른손 처리 - 회전 담당
+    // 오른손 처리 - 회전 담당 (최적화됨)
     handleRightHand(hand) {
-        // 주먹 인식으로 회전 중지
-        if (this.isFist(hand)) {
+        // 간단한 주먹 인식 - 성능 최적화
+        if (this.isSimpleFist(hand)) {
             this.setGesture('FIST_RIGHT');
             return; // 주먹일 때는 회전 중지
         }
         
         // 검지 끝점으로 스와이프 회전 처리
         const indexTip = hand[8];
-        this.handleSwipeGesture(indexTip);
+        this.handleSwipeGestureOptimized(indexTip);
     }
 
-    // 왼손 처리 - 커서 담당  
+    // 왼손 처리 - 커서 담당 (최적화됨)
     handleLeftHand(hand) {
+        // 프레임 스킵 - 커서는 매 2번째 프레임만 처리
+        if (!this.leftFrameSkipCounter) this.leftFrameSkipCounter = 0;
+        this.leftFrameSkipCounter++;
+        
         // 검지 끝점으로 커서 위치 업데이트
         const indexTip = hand[8];
         
@@ -364,22 +374,39 @@ class HandTrackingManager {
             y: indexTip.y
         };
         
-        // 검지로 포인팅하는지 검사
-        if (this.isPointing(hand)) {
-            this.setGesture('POINT_LEFT');
-            this.showCursor(this.cursorPosition);
-            
-            // 포인팅 상태로 일정 시간 유지되면 더블탭으로 간주
-            this.detectPointingTap();
-        } else if (this.isFist(hand)) {
-            this.setGesture('FIST_LEFT');
-        } else {
-            this.setGesture('HAND_LEFT');
-            this.showCursor(this.cursorPosition);
+        // 2번 중 1번만 제스처 검사
+        if (this.leftFrameSkipCounter % 2 === 0) {
+            // 간단한 포인팅 검사
+            if (this.isSimplePointing(hand)) {
+                this.setGesture('POINT_LEFT');
+                this.detectPointingTap();
+            } else if (this.isSimpleFist(hand)) {
+                this.setGesture('FIST_LEFT');
+            } else {
+                this.setGesture('HAND_LEFT');
+            }
         }
+        
+        // 커서는 항상 표시
+        this.showCursor(this.cursorPosition);
     }
 
-    // 주먹 인식
+    // 간단한 주먹 인식 (성능 최적화)
+    isSimpleFist(hand) {
+        // 검지와 중지만 체크 (빠른 인식)
+        const indexTip = hand[8];
+        const indexMcp = hand[5];  // 검지 기저부
+        const middleTip = hand[12];
+        const middleMcp = hand[9]; // 중지 기저부
+        
+        // 검지와 중지가 모두 구부러져 있으면 주먹
+        const indexFolded = indexTip.y > indexMcp.y;
+        const middleFolded = middleTip.y > middleMcp.y;
+        
+        return indexFolded && middleFolded;
+    }
+
+    // 기존 주먹 인식 (정확하지만 느림)
     isFist(hand) {
         // 모든 손가락 끝점이 손바닥보다 아래 있으면 주먹
         const thumbTip = hand[4];
@@ -401,7 +428,21 @@ class HandTrackingManager {
         return extendedFingers <= 2;
     }
 
-    // 포인팅 제스처 인식 (검지만 펴짐)
+    // 간단한 포인팅 제스처 인식 (성능 최적화)
+    isSimplePointing(hand) {
+        const indexTip = hand[8];
+        const indexPip = hand[6];
+        const middleTip = hand[12];
+        const middleMcp = hand[9]; // 중지 기저부
+        
+        // 검지는 펴져있고 중지는 구부러져있음 (간단한 체크)
+        const indexExtended = indexTip.y < indexPip.y;
+        const middleFolded = middleTip.y > middleMcp.y;
+        
+        return indexExtended && middleFolded;
+    }
+
+    // 포인팅 제스처 인식 (정확하지만 느림)
     isPointing(hand) {
         const indexTip = hand[8];
         const indexPip = hand[6];
@@ -450,7 +491,73 @@ class HandTrackingManager {
     
     // 스와이프 회전만 남김
     
-    // 부드러운 스와이프 회전
+    // 최적화된 스와이프 회전 (성능 향상)
+    handleSwipeGestureOptimized(handPosition) {
+        if (!this.orbitControls) return;
+        
+        // 프레임 스킵 - 매 3번째 프레임만 처리 (60fps → 20fps)
+        if (!this.frameSkipCounter) this.frameSkipCounter = 0;
+        this.frameSkipCounter++;
+        if (this.frameSkipCounter % 3 !== 0) return;
+        
+        // 간단한 위치 차이 계산
+        const deltaX = (handPosition.x - this.lastHandPosition.x) * this.sensitivity * 0.5; // 감도 줄임
+        const deltaY = (handPosition.y - this.lastHandPosition.y) * this.sensitivity * 0.5;
+        
+        // 최소 움직임 체크
+        const movement = Math.abs(deltaX) + Math.abs(deltaY);
+        if (movement < this.movementThreshold * 2) { // 더 큰 임계값
+            this.setGesture('HAND');
+            this.lastHandPosition = { x: handPosition.x, y: handPosition.y };
+            return;
+        }
+        
+        // requestAnimationFrame으로 렌더링 최적화
+        if (!this.animationPending) {
+            this.animationPending = true;
+            requestAnimationFrame(() => {
+                this.applyRotation(deltaX, deltaY);
+                this.animationPending = false;
+            });
+        }
+        
+        this.setGesture('ROTATE');
+        this.lastHandPosition = { x: handPosition.x, y: handPosition.y };
+    }
+    
+    // 실제 회전 적용 함수 (분리하여 최적화)
+    applyRotation(deltaX, deltaY) {
+        if (!this.orbitControls) return;
+        
+        const camera = this.orbitControls.object;
+        const target = this.orbitControls.target;
+        
+        // 현재 카메라 위치를 구면 좌표로 변환
+        const position = camera.position.clone().sub(target);
+        const radius = position.length();
+        
+        // 현재 각도 계산
+        let theta = Math.atan2(position.x, position.z);
+        let phi = Math.acos(Math.max(-1, Math.min(1, position.y / radius)));
+        
+        // 각도 변화 적용
+        theta -= deltaX;
+        phi += deltaY;
+        
+        // 상하 각도 제한
+        phi = Math.max(0.1, Math.min(Math.PI - 0.1, phi));
+        
+        // 새로운 카메라 위치 계산
+        const newX = radius * Math.sin(phi) * Math.sin(theta);
+        const newY = radius * Math.cos(phi);
+        const newZ = radius * Math.sin(phi) * Math.cos(theta);
+        
+        // 카메라 위치 업데이트
+        camera.position.set(target.x + newX, target.y + newY, target.z + newZ);
+        camera.lookAt(target);
+    }
+
+    // 기존 부드러운 스와이프 회전 (백업)
     handleSwipeGesture(handPosition) {
         if (!this.orbitControls) {
             console.warn('OrbitControls가 없습니다!');
