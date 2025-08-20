@@ -314,50 +314,20 @@ class HandTrackingManager {
     recognizeGestures(results) {
         const hands = results.multiHandLandmarks;
         
-        if (hands.length === 1) {
+        if (hands.length >= 1) {
+            // 첫 번째 손만 사용해서 스와이프 회전
             this.analyzeSingleHand(hands[0]);
-        } else if (hands.length === 2) {
-            this.setGesture('TWO_HANDS');
         } else {
             this.setGesture('IDLE');
         }
     }
     
     analyzeSingleHand(hand) {
-        // 손가락 끝점들
-        const thumbTip = hand[4];    // 엄지
-        const indexTip = hand[8];    // 검지
-        const middleTip = hand[12];  // 중지
-        const ringTip = hand[16];    // 약지
-        const pinkyTip = hand[20];   // 새끼
+        // 검지 끝점 (손 중심으로 사용)
+        const indexTip = hand[8];
         
-        // 엄지-검지 거리 (핀치 감지)
-        const pinchDistance = this.calculateDistance(thumbTip, indexTip);
-        
-        // 손가락 펼침 상태 확인
-        const isIndexExtended = this.isFingerExtended(hand, 8);
-        const isMiddleExtended = this.isFingerExtended(hand, 12);
-        const isRingExtended = this.isFingerExtended(hand, 16);
-        const isPinkyExtended = this.isFingerExtended(hand, 20);
-        
-        // 펼친 손가락 개수
-        const extendedCount = [isIndexExtended, isMiddleExtended, isRingExtended, isPinkyExtended].filter(Boolean).length;
-        
-        // 1. 핀치 제스처 (엄지+검지 붙이기) - 줌 기능
-        if (pinchDistance < 0.06) {
-            this.handlePinchGesture(pinchDistance);
-        }
-        // 2. 검지만 펴고 가리키기 - 커서 + 더블클릭
-        else if (isIndexExtended && extendedCount === 1) {
-            this.handlePointingGesture(indexTip);
-        }
-        // 3. 손 펼치기 (3개 이상 손가락) - 회전 스와이프
-        else if (extendedCount >= 3) {
-            this.handleSwipeGesture(indexTip);
-        }
-        else {
-            this.setGesture('IDLE');
-        }
+        // 스와이프 회전 (항상 활성화)
+        this.handleSwipeGesture(indexTip);
     }
     
     recognizeTwoHandGestures(hands) {
@@ -448,28 +418,28 @@ class HandTrackingManager {
         this.lastHandPosition = { x: indexTip.x, y: indexTip.y };
     }
     
-    // 3. 손 펼치고 스와이프 - 3D 회전
-    handleSwipeGesture(handCenter) {
+    // 손 스와이프 회전 (유일한 기능)
+    handleSwipeGesture(handPosition) {
         if (!this.orbitControls) return;
         
-        const deltaX = (handCenter.x - this.lastHandPosition.x) * 4; // 감도 증가
-        const deltaY = (handCenter.y - this.lastHandPosition.y) * 4;
+        const deltaX = (handPosition.x - this.lastHandPosition.x) * 5; // 감도 높임
+        const deltaY = (handPosition.y - this.lastHandPosition.y) * 5;
         
         // 움직임이 있을 때만 회전
-        if (Math.abs(deltaX) > 0.01 || Math.abs(deltaY) > 0.01) {
-            this.orbitControls.azimuthalAngle -= deltaX; // 좌우 반전
-            this.orbitControls.polarAngle += deltaY;
+        if (Math.abs(deltaX) > 0.005 || Math.abs(deltaY) > 0.005) {
+            this.orbitControls.azimuthalAngle -= deltaX; // 좌우 회전
+            this.orbitControls.polarAngle += deltaY;     // 상하 회전
             
-            // 각도 제한
+            // 상하 각도 제한 (완전히 뒤집히지 않게)
             this.orbitControls.polarAngle = Math.max(0.1, Math.min(Math.PI - 0.1, this.orbitControls.polarAngle));
             
             this.orbitControls.update();
-            this.setGesture('SWIPE');
+            this.setGesture('ROTATE');
         } else {
-            this.setGesture('HAND_OPEN');
+            this.setGesture('HAND');
         }
         
-        this.lastHandPosition = { x: handCenter.x, y: handCenter.y };
+        this.lastHandPosition = { x: handPosition.x, y: handPosition.y };
     }
     
     handleZoomGesture(distanceChange) {
