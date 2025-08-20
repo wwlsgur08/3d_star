@@ -111,25 +111,41 @@ class HandTrackingManager {
         try {
             console.log('📡 MediaPipe 초기화 시작...');
             
-            // MediaPipe가 로드되었는지 확인
+            // MediaPipe 라이브러리 로딩 대기 (최대 10초)
+            let attempts = 0;
+            while ((!window.Hands || !window.Camera) && attempts < 20) {
+                console.log(`⏳ MediaPipe 라이브러리 로딩 대기 중... (${attempts + 1}/20)`);
+                await new Promise(resolve => setTimeout(resolve, 500));
+                attempts++;
+            }
+            
             if (!window.Hands || !window.Camera) {
-                console.error('❌ MediaPipe 라이브러리가 로드되지 않았습니다.');
-                this.updateStatus('camera-status', 'ERROR');
+                console.error('❌ MediaPipe 라이브러리 로딩 실패');
+                this.updateStatus('camera-status', 'LIBRARY_ERROR');
+                // 대체 방법: 간단한 웹캠 스트림만 표시
+                this.fallbackMode();
                 return;
             }
+            
+            console.log('✅ MediaPipe 라이브러리 로드 완료');
             
             // MediaPipe Hands 초기화
             this.hands = new window.Hands({
                 locateFile: (file) => {
-                    return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
+                    // CDN 대신 여러 소스 시도
+                    const sources = [
+                        `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`,
+                        `https://unpkg.com/@mediapipe/hands/${file}`
+                    ];
+                    return sources[0]; // 첫 번째 소스 사용
                 }
             });
             
             this.hands.setOptions({
                 maxNumHands: 2,
-                modelComplexity: 1,
-                minDetectionConfidence: 0.5, // 감도 낮춤
-                minTrackingConfidence: 0.3,  // 감도 낮춤
+                modelComplexity: 0, // 0으로 낮춤 (더 빠름)
+                minDetectionConfidence: 0.3, // 더 감도 낮춤
+                minTrackingConfidence: 0.2,  // 더 감도 낮춤
             });
             
             this.hands.onResults(this.onResults.bind(this));
@@ -155,7 +171,15 @@ class HandTrackingManager {
         } catch (error) {
             console.error('❌ MediaPipe 설정 실패:', error);
             this.updateStatus('camera-status', 'ERROR');
+            this.fallbackMode();
         }
+    }
+    
+    // 대체 모드: MediaPipe 없이 웹캠만 표시
+    fallbackMode() {
+        console.log('🔄 대체 모드 활성화 - 웹캠만 표시');
+        this.updateStatus('hands-status', 'DISABLED');
+        this.setGesture('FALLBACK');
     }
     
     onResults(results) {

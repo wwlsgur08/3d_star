@@ -19,10 +19,29 @@ const io = socketIo(server, {
 });
 
 // 미들웨어 설정
-app.use(cors());
+app.use(cors({
+    origin: "*",
+    credentials: true
+}));
 app.use(express.json({ limit: '10mb' })); // PNG 이미지 처리를 위한 큰 용량
-// 정적 파일 서빙 (index.html은 제외)
-app.use(express.static('.', { index: false }));
+
+// 정적 파일 서빙을 위한 MIME 타입 설정
+app.use(express.static('.', { 
+    index: false,
+    setHeaders: (res, path) => {
+        if (path.endsWith('.js')) {
+            res.setHeader('Content-Type', 'application/javascript');
+        }
+        if (path.endsWith('.wasm')) {
+            res.setHeader('Content-Type', 'application/wasm');
+        }
+        // MediaPipe 파일들에 대한 CORS 헤더
+        if (path.includes('mediapipe') || path.includes('hands')) {
+            res.setHeader('Cross-Origin-Embedder-Policy', 'require-corp');
+            res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
+        }
+    }
+}));
 
 const PORT = process.env.PORT || 3333;
 
