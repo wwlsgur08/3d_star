@@ -90,10 +90,19 @@ class HandTrackingManager {
             return new Promise((resolve) => {
                 this.videoElement.addEventListener('loadeddata', () => {
                     console.log('📹 비디오 스트림 준비 완료');
+                    console.log('📏 비디오 크기:', this.videoElement.videoWidth, 'x', this.videoElement.videoHeight);
                     setTimeout(() => {
                         if (this.camera) {
                             console.log('▶️ MediaPipe 카메라 시작');
                             this.camera.start();
+                            
+                            // 5초 후 강제로 테스트 프레임 전송
+                            setTimeout(() => {
+                                console.log('🔄 강제 테스트 프레임 전송...');
+                                if (this.hands) {
+                                    this.hands.send({image: this.videoElement});
+                                }
+                            }, 5000);
                         }
                         resolve();
                     }, 500);
@@ -183,8 +192,8 @@ class HandTrackingManager {
     }
     
     onResults(results) {
-        // 프레임 처리 로그 (매우 자주 호출되므로 조건부로)
-        if (Math.random() < 0.01) { // 1% 확률로만 로그
+        // 프레임 처리 로그 (더 자주 확인)
+        if (Math.random() < 0.1) { // 10% 확률로 로그
             console.log('📡 MediaPipe 프레임 처리 중...', {
                 hasResults: !!results,
                 hasMultiHandLandmarks: !!results.multiHandLandmarks,
