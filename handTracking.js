@@ -15,20 +15,15 @@ class HandTrackingManager {
         // 3D 카메라 컨트롤 참조
         this.orbitControls = null;
         
-        // 새로운 제스처 인식 변수들
+        // 스와이프 회전용 변수들
         this.lastHandPosition = { x: 0, y: 0 };
-        this.lastPinchDistance = 0;
-        this.cursorPosition = { x: 0.5, y: 0.5 };
+        this.smoothedPosition = { x: 0, y: 0 };
+        this.positionHistory = [];
         
-        // 더블 클릭 감지
-        this.lastTapTime = 0;
-        this.tapCount = 0;
-        this.tapTimeout = null;
-        
-        // 제스처 상태
-        this.isPointing = false;
-        this.isPinching = false;
-        this.isHandOpen = false;
+        // 움직임 감지 설정
+        this.movementThreshold = 0.01; // 최소 움직임 크기
+        this.smoothingFactor = 0.3;    // 스무딩 강도 (0~1, 낮을수록 부드러움)
+        this.sensitivity = 2;          // 회전 감도 (낮춤)
         
         this.init();
     }
@@ -332,29 +327,32 @@ class HandTrackingManager {
     
     // 스와이프 회전만 남김
     
-    // 손 스와이프 회전 (유일한 기능)
+    // 부드러운 스와이프 회전
     handleSwipeGesture(handPosition) {
         if (!this.orbitControls) {
             console.warn('OrbitControls가 없습니다!');
             return;
         }
         
-        const deltaX = (handPosition.x - this.lastHandPosition.x) * 8; // 감도 더 높임
-        const deltaY = (handPosition.y - this.lastHandPosition.y) * 8;
-        
-        // 디버깅 로그 (가끔씩만)
-        if (Math.random() < 0.01) {
-            console.log('🤚 손 위치:', {
-                x: handPosition.x.toFixed(3),
-                y: handPosition.y.toFixed(3),
-                deltaX: deltaX.toFixed(3),
-                deltaY: deltaY.toFixed(3)
-            });
+        // 1. 위치 히스토리에 추가 (최근 5개만 유지)
+        this.positionHistory.push({ x: handPosition.x, y: handPosition.y });
+        if (this.positionHistory.length > 5) {
+            this.positionHistory.shift();
         }
         
-        // 움직임이 있을 때만 회전
-        if (Math.abs(deltaX) > 0.001 || Math.abs(deltaY) > 0.001) {
-            // Three.js 카메라를 직접 조작
+        // 2. 스무딩 적용 (지수 이동 평균)
+        this.smoothedPosition.x = this.smoothedPosition.x * (1 - this.smoothingFactor) + 
+                                 handPosition.x * this.smoothingFactor;
+        this.smoothedPosition.y = this.smoothedPosition.y * (1 - this.smoothingFactor) + 
+                                 handPosition.y * this.smoothingFactor;
+        
+        // 3. 스무딩된 움직임 계산
+        const deltaX = (this.smoothedPosition.x - this.lastHandPosition.x) * this.sensitivity;
+        const deltaY = (this.smoothedPosition.y - this.lastHandPosition.y) * this.sensitivity;
+        
+        // 4. 떨림 필터링 - 최소 움직임보다 클 때만 회전
+        if (Math.abs(deltaX) > this.movementThreshold || Math.abs(deltaY) > this.movementThreshold) {
+            
             const camera = this.orbitControls.object;
             const target = this.orbitControls.target;
             
@@ -363,10 +361,10 @@ class HandTrackingManager {
             const radius = position.length();
             
             // 현재 각도 계산
-            let theta = Math.atan2(position.x, position.z); // 좌우 회전각
-            let phi = Math.acos(position.y / radius);       // 상하 회전각
+            let theta = Math.atan2(position.x, position.z);
+            let phi = Math.acos(Math.max(-1, Math.min(1, position.y / radius))); // 안전한 acos
             
-            // 손 움직임을 각도 변화로 적용
+            // 부드러운 각도 변화 적용
             theta -= deltaX;
             phi += deltaY;
             
@@ -378,26 +376,30 @@ class HandTrackingManager {
             const newY = radius * Math.cos(phi);
             const newZ = radius * Math.sin(phi) * Math.cos(theta);
             
-            // 카메라 위치 업데이트 (THREE 없이)
+            // 카메라 위치 업데이트
             camera.position.set(target.x + newX, target.y + newY, target.z + newZ);
             camera.lookAt(target);
             
             this.setGesture('ROTATE');
             
-            // 강제로 렌더링 업데이트 (필요한 경우)
-            if (this.orbitControls.update) {
-                this.orbitControls.update();
+            // 디버깅 로그 (가끔씩만)
+            if (Math.random() < 0.005) {
+                console.log('🌍 부드러운 회전:', {
+                    deltaX: deltaX.toFixed(4),
+                    deltaY: deltaY.toFixed(4),
+                    smoothX: this.smoothedPosition.x.toFixed(4),
+                    smoothY: this.smoothedPosition.y.toFixed(4)
+                });
             }
-            
-            console.log('🌍 카메라 회전!', {
-                deltaX: deltaX.toFixed(3),
-                deltaY: deltaY.toFixed(3)
-            });
         } else {
             this.setGesture('HAND');
         }
         
-        this.lastHandPosition = { x: handPosition.x, y: handPosition.y };
+        // 마지막 위치 업데이트 (스무딩된 위치 사용)
+        this.lastHandPosition = { 
+            x: this.smoothedPosition.x, 
+            y: this.smoothedPosition.y 
+        };
     }
     
     handleZoomGesture(distanceChange) {
