@@ -15,14 +15,20 @@ class HandTrackingManager {
         // 3D 카메라 컨트롤 참조
         this.orbitControls = null;
         
-        // 제스처 인식을 위한 변수들
+        // 새로운 제스처 인식 변수들
         this.lastHandPosition = { x: 0, y: 0 };
-        this.gestureStartTime = 0;
-        this.isGesturing = false;
+        this.lastPinchDistance = 0;
+        this.cursorPosition = { x: 0.5, y: 0.5 };
         
-        // 줌 제스처를 위한 변수들
-        this.lastTwoHandDistance = 0;
-        this.zoomSensitivity = 0.01;
+        // 더블 클릭 감지
+        this.lastTapTime = 0;
+        this.tapCount = 0;
+        this.tapTimeout = null;
+        
+        // 제스처 상태
+        this.isPointing = false;
+        this.isPinching = false;
+        this.isHandOpen = false;
         
         this.init();
     }
@@ -309,39 +315,48 @@ class HandTrackingManager {
         const hands = results.multiHandLandmarks;
         
         if (hands.length === 1) {
-            this.recognizeSingleHandGestures(hands[0]);
+            this.analyzeSingleHand(hands[0]);
         } else if (hands.length === 2) {
-            this.recognizeTwoHandGestures(hands);
+            this.setGesture('TWO_HANDS');
+        } else {
+            this.setGesture('IDLE');
         }
     }
     
-    recognizeSingleHandGestures(hand) {
-        // 검지 끝점
-        const indexTip = hand[8];
-        const indexMcp = hand[5];
+    analyzeSingleHand(hand) {
+        // 손가락 끝점들
+        const thumbTip = hand[4];    // 엄지
+        const indexTip = hand[8];    // 검지
+        const middleTip = hand[12];  // 중지
+        const ringTip = hand[16];    // 약지
+        const pinkyTip = hand[20];   // 새끼
         
-        // 엄지 끝점
-        const thumbTip = hand[4];
-        const thumbMcp = hand[1];
+        // 엄지-검지 거리 (핀치 감지)
+        const pinchDistance = this.calculateDistance(thumbTip, indexTip);
         
-        // 핀치 제스처 감지 (엄지와 검지가 가까운지)
-        const distance = this.calculateDistance(thumbTip, indexTip);
-        const isPinching = distance < 0.08;
+        // 손가락 펼침 상태 확인
+        const isIndexExtended = this.isFingerExtended(hand, 8);
+        const isMiddleExtended = this.isFingerExtended(hand, 12);
+        const isRingExtended = this.isFingerExtended(hand, 16);
+        const isPinkyExtended = this.isFingerExtended(hand, 20);
         
-        // 포인팅 제스처 감지 (검지만 펴져있는지)
-        const isPointing = this.isFingerExtended(hand, 8) && 
-                          !this.isFingerExtended(hand, 12) && 
-                          !this.isFingerExtended(hand, 16) && 
-                          !this.isFingerExtended(hand, 20);
+        // 펼친 손가락 개수
+        const extendedCount = [isIndexExtended, isMiddleExtended, isRingExtended, isPinkyExtended].filter(Boolean).length;
         
-        if (isPinching) {
-            this.setGesture('PINCH');
+        // 1. 핀치 제스처 (엄지+검지 붙이기) - 줌 기능
+        if (pinchDistance < 0.06) {
+            this.handlePinchGesture(pinchDistance);
+        }
+        // 2. 검지만 펴고 가리키기 - 커서 + 더블클릭
+        else if (isIndexExtended && extendedCount === 1) {
+            this.handlePointingGesture(indexTip);
+        }
+        // 3. 손 펼치기 (3개 이상 손가락) - 회전 스와이프
+        else if (extendedCount >= 3) {
             this.handleSwipeGesture(indexTip);
-        } else if (isPointing) {
-            this.setGesture('POINT');
-            this.handleSwipeGesture(indexTip);
-        } else {
-            this.setGesture('OPEN');
+        }
+        else {
+            this.setGesture('IDLE');
         }
     }
     
@@ -379,22 +394,82 @@ class HandTrackingManager {
         this.lastTwoHandDistance = handDistance;
     }
     
-    handleSwipeGesture(currentPosition) {
+    // 1. 핀치 줌 제스처 (엄지+검지 붙였다 떼기)
+    handlePinchGesture(currentDistance) {
         if (!this.orbitControls) return;
         
-        const deltaX = (currentPosition.x - this.lastHandPosition.x) * 3; // 감도 증가
-        const deltaY = (currentPosition.y - this.lastHandPosition.y) * 3;
+        if (this.lastPinchDistance > 0) {
+            const distanceChange = currentDistance - this.lastPinchDistance;
+            
+            // 거리 변화가 클 때만 줌 적용
+            if (Math.abs(distanceChange) > 0.01) {
+                try {
+                    const camera = this.orbitControls.object;
+                    const target = this.orbitControls.target;
+                    const direction = camera.position.clone().sub(target).normalize();
+                    const currentDist = camera.position.distanceTo(target);
+                    
+                    // 핀치 거리 변화를 줌으로 변환
+                    const zoomFactor = distanceChange * 10;
+                    const newDistance = Math.max(0.5, Math.min(10, currentDist + zoomFactor));
+                    
+                    camera.position.copy(target).add(direction.multiplyScalar(newDistance));
+                    this.orbitControls.update();
+                    
+                    this.setGesture(distanceChange > 0 ? 'ZOOM_OUT' : 'ZOOM_IN');
+                } catch (error) {
+                    console.warn('핀치 줌 오류:', error.message);
+                }
+            }
+        }
         
-        // OrbitControls 회전 각도 직접 조정
-        this.orbitControls.azimuthalAngle += deltaX;
-        this.orbitControls.polarAngle += deltaY;
+        this.lastPinchDistance = currentDistance;
+        if (!this.currentGesture.includes('ZOOM')) {
+            this.setGesture('PINCH');
+        }
+    }
+    
+    // 2. 검지 가리키기 - 커서 및 더블클릭
+    handlePointingGesture(indexTip) {
+        // 커서 위치 업데이트
+        this.cursorPosition.x = indexTip.x;
+        this.cursorPosition.y = indexTip.y;
         
-        // 각도 제한
-        this.orbitControls.polarAngle = Math.max(0.1, Math.min(Math.PI - 0.1, this.orbitControls.polarAngle));
+        // 화면에 커서 표시
+        this.showCursor(this.cursorPosition);
         
-        this.orbitControls.update();
+        // 더블 탭 감지 (손가락이 거의 안 움직일 때)
+        const movement = this.calculateDistance(indexTip, this.lastHandPosition);
+        if (movement < 0.02) { // 거의 정지 상태
+            this.detectDoubleTap();
+        }
         
-        this.lastHandPosition = { x: currentPosition.x, y: currentPosition.y };
+        this.setGesture('POINT');
+        this.lastHandPosition = { x: indexTip.x, y: indexTip.y };
+    }
+    
+    // 3. 손 펼치고 스와이프 - 3D 회전
+    handleSwipeGesture(handCenter) {
+        if (!this.orbitControls) return;
+        
+        const deltaX = (handCenter.x - this.lastHandPosition.x) * 4; // 감도 증가
+        const deltaY = (handCenter.y - this.lastHandPosition.y) * 4;
+        
+        // 움직임이 있을 때만 회전
+        if (Math.abs(deltaX) > 0.01 || Math.abs(deltaY) > 0.01) {
+            this.orbitControls.azimuthalAngle -= deltaX; // 좌우 반전
+            this.orbitControls.polarAngle += deltaY;
+            
+            // 각도 제한
+            this.orbitControls.polarAngle = Math.max(0.1, Math.min(Math.PI - 0.1, this.orbitControls.polarAngle));
+            
+            this.orbitControls.update();
+            this.setGesture('SWIPE');
+        } else {
+            this.setGesture('HAND_OPEN');
+        }
+        
+        this.lastHandPosition = { x: handCenter.x, y: handCenter.y };
     }
     
     handleZoomGesture(distanceChange) {
@@ -452,6 +527,95 @@ class HandTrackingManager {
                 this.gestureHistory.shift();
             }
         }
+    }
+    
+    // 화면에 커서 표시
+    showCursor(position) {
+        const canvas = this.canvasElement;
+        const ctx = this.canvasCtx;
+        
+        // 커서 위치 계산 (정규화된 좌표를 캔버스 좌표로 변환)
+        const x = position.x * canvas.width;
+        const y = position.y * canvas.height;
+        
+        // 동그란 커서 그리기
+        ctx.fillStyle = 'rgba(0, 255, 100, 0.8)';
+        ctx.strokeStyle = 'rgba(0, 255, 100, 1)';
+        ctx.lineWidth = 2;
+        
+        ctx.beginPath();
+        ctx.arc(x, y, 8, 0, 2 * Math.PI);
+        ctx.fill();
+        ctx.stroke();
+        
+        // 중심점
+        ctx.fillStyle = 'white';
+        ctx.beginPath();
+        ctx.arc(x, y, 3, 0, 2 * Math.PI);
+        ctx.fill();
+    }
+    
+    // 더블 탭 감지
+    detectDoubleTap() {
+        const now = Date.now();
+        
+        if (this.tapTimeout) {
+            clearTimeout(this.tapTimeout);
+            this.tapTimeout = null;
+        }
+        
+        if (now - this.lastTapTime < 500) { // 500ms 내 두 번째 탭
+            this.tapCount++;
+            if (this.tapCount >= 2) {
+                this.handleDoubleClick();
+                this.tapCount = 0;
+                this.lastTapTime = 0;
+                return;
+            }
+        } else {
+            this.tapCount = 1;
+        }
+        
+        this.lastTapTime = now;
+        
+        // 500ms 후 탭 카운트 리셋
+        this.tapTimeout = setTimeout(() => {
+            this.tapCount = 0;
+            this.tapTimeout = null;
+        }, 500);
+    }
+    
+    // 더블 클릭 처리
+    handleDoubleClick() {
+        console.log('👆👆 더블클릭 감지!', this.cursorPosition);
+        this.setGesture('DOUBLE_CLICK');
+        
+        // Three.js 화면에서 클릭된 별 찾기 (기존 코드 활용)
+        this.performStarClick();
+        
+        // 1초 후 제스처 리셋
+        setTimeout(() => {
+            if (this.currentGesture === 'DOUBLE_CLICK') {
+                this.setGesture('POINT');
+            }
+        }, 1000);
+    }
+    
+    // 별 클릭 수행 (기존 별자리 앱의 클릭 이벤트 활용)
+    performStarClick() {
+        // 정규화된 좌표를 화면 좌표로 변환
+        const screenX = this.cursorPosition.x * window.innerWidth;
+        const screenY = this.cursorPosition.y * window.innerHeight;
+        
+        // 마우스 클릭 이벤트 시뮬레이션
+        const clickEvent = new MouseEvent('dblclick', {
+            clientX: screenX,
+            clientY: screenY,
+            bubbles: true
+        });
+        
+        document.dispatchEvent(clickEvent);
+        console.log('🌟 별 클릭 시뮬레이션:', screenX, screenY);
     }
     
     updateStatus(elementId, value, className = '') {
