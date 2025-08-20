@@ -164,11 +164,21 @@ class HandTrackingManager {
             this.camera = new window.Camera(this.videoElement, {
                 onFrame: async () => {
                     try {
+                        console.log('🎬 프레임 전송 중...', {
+                            hasHands: !!this.hands,
+                            videoReady: this.videoElement.readyState,
+                            videoWidth: this.videoElement.videoWidth,
+                            videoHeight: this.videoElement.videoHeight
+                        });
+                        
                         if (this.hands && this.videoElement.readyState === 4) {
                             await this.hands.send({ image: this.videoElement });
+                            console.log('✅ 프레임 전송 완료');
+                        } else {
+                            console.warn('❌ 프레임 전송 실패 - 조건 미충족');
                         }
                     } catch (error) {
-                        console.error('프레임 처리 오류:', error);
+                        console.error('❌ 프레임 처리 오류:', error);
                     }
                 },
                 width: 640,
