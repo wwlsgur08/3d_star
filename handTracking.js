@@ -377,12 +377,16 @@ class HandTrackingManager {
     handleSwipeGesture(currentPosition) {
         if (!this.orbitControls) return;
         
-        const deltaX = (currentPosition.x - this.lastHandPosition.x) * 2;
-        const deltaY = (currentPosition.y - this.lastHandPosition.y) * 2;
+        const deltaX = (currentPosition.x - this.lastHandPosition.x) * 3; // 감도 증가
+        const deltaY = (currentPosition.y - this.lastHandPosition.y) * 3;
         
-        // 회전 적용
-        this.orbitControls.rotateLeft(deltaX);
-        this.orbitControls.rotateUp(deltaY);
+        // OrbitControls 회전 각도 직접 조정
+        this.orbitControls.azimuthalAngle += deltaX;
+        this.orbitControls.polarAngle += deltaY;
+        
+        // 각도 제한
+        this.orbitControls.polarAngle = Math.max(0.1, Math.min(Math.PI - 0.1, this.orbitControls.polarAngle));
+        
         this.orbitControls.update();
         
         this.lastHandPosition = { x: currentPosition.x, y: currentPosition.y };
@@ -391,8 +395,16 @@ class HandTrackingManager {
     handleZoomGesture(distanceChange) {
         if (!this.orbitControls) return;
         
-        const zoomFactor = distanceChange * this.zoomSensitivity * -50;
-        this.orbitControls.dollyIn(1 + zoomFactor);
+        const zoomFactor = distanceChange * 5; // 줌 감도 조정
+        
+        if (distanceChange > 0) {
+            // 손을 벌릴 때 - 확대
+            this.orbitControls.dollyOut(1 - zoomFactor);
+        } else {
+            // 손을 모을 때 - 축소
+            this.orbitControls.dollyIn(1 + Math.abs(zoomFactor));
+        }
+        
         this.orbitControls.update();
     }
     
