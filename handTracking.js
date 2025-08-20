@@ -33,74 +33,117 @@ class HandTrackingManager {
         // UI 요소들 가져오기
         this.videoElement = document.getElementById('webcam-video');
         this.canvasElement = document.getElementById('hand-overlay');
+        
+        if (!this.videoElement || !this.canvasElement) {
+            console.error('❌ UI 요소를 찾을 수 없습니다');
+            return;
+        }
+        
         this.canvasCtx = this.canvasElement.getContext('2d');
         
         // 캔버스 크기 설정
         this.canvasElement.width = 160;
         this.canvasElement.height = 120;
         
+        // 단계별 초기화
+        console.log('1️⃣ 카메라 설정 중...');
         await this.setupCamera();
-        await this.setupMediaPipe();
         
-        this.updateStatus('camera-status', 'ON', 'active');
-        document.getElementById('hand-tracking-container').classList.add('active');
+        console.log('2️⃣ MediaPipe 설정 중...');  
+        await this.setupMediaPipe();
         
         console.log('✅ Hand Tracking Manager 초기화 완료');
     }
     
     async setupCamera() {
         try {
+            console.log('📹 카메라 권한 요청 중...');
+            
             const stream = await navigator.mediaDevices.getUserMedia({
                 video: {
-                    width: 640,
-                    height: 480,
+                    width: { ideal: 640 },
+                    height: { ideal: 480 },
                     facingMode: 'user'
-                }
+                },
+                audio: false
             });
             
             this.videoElement.srcObject = stream;
             this.updateStatus('camera-status', 'ON', 'active');
+            document.getElementById('hand-tracking-container').classList.add('active');
             
-            // 비디오가 준비되면 MediaPipe 시작
-            this.videoElement.addEventListener('loadeddata', () => {
-                if (this.camera) {
-                    this.camera.start();
-                }
+            console.log('✅ 카메라 스트림 연결 완료');
+            
+            // 비디오가 완전히 로드되면 실행
+            return new Promise((resolve) => {
+                this.videoElement.addEventListener('loadeddata', () => {
+                    console.log('📹 비디오 스트림 준비 완료');
+                    setTimeout(() => {
+                        if (this.camera) {
+                            console.log('▶️ MediaPipe 카메라 시작');
+                            this.camera.start();
+                        }
+                        resolve();
+                    }, 500);
+                });
             });
             
         } catch (error) {
-            console.error('카메라 접근 실패:', error);
-            this.updateStatus('camera-status', 'ERROR');
+            console.error('❌ 카메라 접근 실패:', error);
+            this.updateStatus('camera-status', 'DENIED');
+            alert('웹캠 권한이 필요합니다. 브라우저 설정에서 카메라 권한을 허용해주세요.');
         }
     }
     
     async setupMediaPipe() {
-        // MediaPipe Hands 초기화
-        this.hands = new Hands({
-            locateFile: (file) => {
-                return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
+        try {
+            console.log('📡 MediaPipe 초기화 시작...');
+            
+            // MediaPipe가 로드되었는지 확인
+            if (!window.Hands || !window.Camera) {
+                console.error('❌ MediaPipe 라이브러리가 로드되지 않았습니다.');
+                this.updateStatus('camera-status', 'ERROR');
+                return;
             }
-        });
-        
-        this.hands.setOptions({
-            maxNumHands: 2,
-            modelComplexity: 1,
-            minDetectionConfidence: 0.7,
-            minTrackingConfidence: 0.5,
-        });
-        
-        this.hands.onResults(this.onResults.bind(this));
-        
-        // 카메라 설정
-        this.camera = new Camera(this.videoElement, {
-            onFrame: async () => {
-                if (this.hands) {
-                    await this.hands.send({ image: this.videoElement });
+            
+            // MediaPipe Hands 초기화
+            this.hands = new window.Hands({
+                locateFile: (file) => {
+                    return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
                 }
-            },
-            width: 640,
-            height: 480
-        });
+            });
+            
+            this.hands.setOptions({
+                maxNumHands: 2,
+                modelComplexity: 1,
+                minDetectionConfidence: 0.5, // 감도 낮춤
+                minTrackingConfidence: 0.3,  // 감도 낮춤
+            });
+            
+            this.hands.onResults(this.onResults.bind(this));
+            console.log('✅ MediaPipe Hands 설정 완료');
+            
+            // 카메라 설정
+            this.camera = new window.Camera(this.videoElement, {
+                onFrame: async () => {
+                    try {
+                        if (this.hands && this.videoElement.readyState === 4) {
+                            await this.hands.send({ image: this.videoElement });
+                        }
+                    } catch (error) {
+                        console.error('프레임 처리 오류:', error);
+                    }
+                },
+                width: 640,
+                height: 480
+            });
+            
+            console.log('✅ MediaPipe 카메라 설정 완료');
+            
+        } catch (error) {
+            console.error('❌ MediaPipe 설정 실패:', error);
+            this.updateStatus('camera-status', 'ERROR');
+        }
     }
     
     onResults(results) {

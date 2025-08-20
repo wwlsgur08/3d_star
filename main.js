@@ -515,13 +515,20 @@ controls.target.set(0, 0, 0);
 controls.enablePan = false;
 
 // 손 추적 초기화 (OrbitControls 설정 후)
-setTimeout(() => {
+function initHandTracking() {
+    console.log('🎯 손 추적 초기화 시도...');
     if (window.HandTrackingManager) {
         handTracker = new window.HandTrackingManager();
         handTracker.setOrbitControls(controls);
         console.log('🤚 손 추적 기능 활성화');
+    } else {
+        console.warn('⚠️ HandTrackingManager가 로드되지 않았습니다. 재시도...');
+        setTimeout(initHandTracking, 1000);
     }
-}, 2000); // 2초 후 초기화 (인트로 후)
+}
+
+// 페이지 로드 완료 후 초기화
+setTimeout(initHandTracking, 3000); // 3초 후 초기화
 
 // 자동 회전 시스템 변수
 let autoRotate = true; // 자동 회전 상태
