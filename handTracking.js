@@ -149,22 +149,27 @@ class HandTrackingManager {
             this.hands.onResults(this.onResults.bind(this));
             console.log('✅ MediaPipe Hands 설정 완료');
             
-            // 카메라 설정
+            // MediaPipe 카메라 객체 생성 (아직 시작하지 않음)
+            console.log('📷 MediaPipe 카메라 객체 생성 중...');
             this.camera = new window.Camera(this.videoElement, {
                 onFrame: async () => {
                     try {
-                        console.log('🎬 프레임 전송 중...', {
-                            hasHands: !!this.hands,
-                            videoReady: this.videoElement.readyState,
-                            videoWidth: this.videoElement.videoWidth,
-                            videoHeight: this.videoElement.videoHeight
-                        });
+                        // 프레임 전송 로그는 너무 자주 나오므로 1%로 제한
+                        if (Math.random() < 0.01) {
+                            console.log('🎬 프레임 전송 중...', {
+                                hasHands: !!this.hands,
+                                videoReady: this.videoElement.readyState,
+                                videoWidth: this.videoElement.videoWidth,
+                                videoHeight: this.videoElement.videoHeight
+                            });
+                        }
                         
                         if (this.hands && this.videoElement.readyState === 4) {
                             await this.hands.send({ image: this.videoElement });
-                            console.log('✅ 프레임 전송 완료');
-                        } else {
-                            console.warn('❌ 프레임 전송 실패 - 조건 미충족');
+                            // 프레임 전송 완료 로그도 1%로 제한
+                            if (Math.random() < 0.01) {
+                                console.log('✅ 프레임 전송 완료');
+                            }
                         }
                     } catch (error) {
                         console.error('❌ 프레임 처리 오류:', error);
@@ -174,7 +179,7 @@ class HandTrackingManager {
                 height: 480
             });
             
-            console.log('✅ MediaPipe 카메라 설정 완료');
+            console.log('✅ MediaPipe 카메라 객체 생성 완료 (아직 시작되지 않음)');
             
         } catch (error) {
             console.error('❌ MediaPipe 설정 실패:', error);
