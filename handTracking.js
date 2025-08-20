@@ -330,107 +330,34 @@ class HandTrackingManager {
         this.handleSwipeGesture(indexTip);
     }
     
-    recognizeTwoHandGestures(hands) {
-        const hand1 = hands[0];
-        const hand2 = hands[1];
-        
-        // 두 손의 검지 끝점
-        const index1 = hand1[8];
-        const index2 = hand2[8];
-        
-        // 두 손 사이의 거리
-        const handDistance = this.calculateDistance(index1, index2);
-        
-        // 줌 제스처 감지
-        if (this.lastTwoHandDistance > 0) {
-            const distanceChange = handDistance - this.lastTwoHandDistance;
-            
-            if (Math.abs(distanceChange) > 0.02) {
-                try {
-                    if (distanceChange > 0) {
-                        this.setGesture('ZOOM_OUT');
-                        this.handleZoomGesture(distanceChange);
-                    } else {
-                        this.setGesture('ZOOM_IN');
-                        this.handleZoomGesture(distanceChange);
-                    }
-                } catch (error) {
-                    console.warn('줌 제스처 스킵:', error.message);
-                    this.setGesture('ZOOM_DISABLED');
-                }
-            }
-        }
-        
-        this.lastTwoHandDistance = handDistance;
-    }
-    
-    // 1. 핀치 줌 제스처 (엄지+검지 붙였다 떼기)
-    handlePinchGesture(currentDistance) {
-        if (!this.orbitControls) return;
-        
-        if (this.lastPinchDistance > 0) {
-            const distanceChange = currentDistance - this.lastPinchDistance;
-            
-            // 거리 변화가 클 때만 줌 적용
-            if (Math.abs(distanceChange) > 0.01) {
-                try {
-                    const camera = this.orbitControls.object;
-                    const target = this.orbitControls.target;
-                    const direction = camera.position.clone().sub(target).normalize();
-                    const currentDist = camera.position.distanceTo(target);
-                    
-                    // 핀치 거리 변화를 줌으로 변환
-                    const zoomFactor = distanceChange * 10;
-                    const newDistance = Math.max(0.5, Math.min(10, currentDist + zoomFactor));
-                    
-                    camera.position.copy(target).add(direction.multiplyScalar(newDistance));
-                    this.orbitControls.update();
-                    
-                    this.setGesture(distanceChange > 0 ? 'ZOOM_OUT' : 'ZOOM_IN');
-                } catch (error) {
-                    console.warn('핀치 줌 오류:', error.message);
-                }
-            }
-        }
-        
-        this.lastPinchDistance = currentDistance;
-        if (!this.currentGesture.includes('ZOOM')) {
-            this.setGesture('PINCH');
-        }
-    }
-    
-    // 2. 검지 가리키기 - 커서 및 더블클릭
-    handlePointingGesture(indexTip) {
-        // 커서 위치 업데이트
-        this.cursorPosition.x = indexTip.x;
-        this.cursorPosition.y = indexTip.y;
-        
-        // 화면에 커서 표시
-        this.showCursor(this.cursorPosition);
-        
-        // 더블 탭 감지 (손가락이 거의 안 움직일 때)
-        const movement = this.calculateDistance(indexTip, this.lastHandPosition);
-        if (movement < 0.02) { // 거의 정지 상태
-            this.detectDoubleTap();
-        }
-        
-        this.setGesture('POINT');
-        this.lastHandPosition = { x: indexTip.x, y: indexTip.y };
-    }
+    // 스와이프 회전만 남김
     
     // 손 스와이프 회전 (유일한 기능)
     handleSwipeGesture(handPosition) {
-        if (!this.orbitControls) return;
+        if (!this.orbitControls) {
+            console.warn('OrbitControls가 없습니다!');
+            return;
+        }
         
-        const deltaX = (handPosition.x - this.lastHandPosition.x) * 5; // 감도 높임
-        const deltaY = (handPosition.y - this.lastHandPosition.y) * 5;
+        const deltaX = (handPosition.x - this.lastHandPosition.x) * 8; // 감도 더 높임
+        const deltaY = (handPosition.y - this.lastHandPosition.y) * 8;
+        
+        // 디버깅 로그 (가끔씩만)
+        if (Math.random() < 0.01) {
+            console.log('🤚 손 위치:', {
+                x: handPosition.x.toFixed(3),
+                y: handPosition.y.toFixed(3),
+                deltaX: deltaX.toFixed(3),
+                deltaY: deltaY.toFixed(3)
+            });
+        }
         
         // 움직임이 있을 때만 회전
-        if (Math.abs(deltaX) > 0.005 || Math.abs(deltaY) > 0.005) {
+        if (Math.abs(deltaX) > 0.001 || Math.abs(deltaY) > 0.001) {
             this.orbitControls.azimuthalAngle -= deltaX; // 좌우 회전
             this.orbitControls.polarAngle += deltaY;     // 상하 회전
             
-            // 상하 각도 제한 (완전히 뒤집히지 않게)
+            // 상하 각도 제한
             this.orbitControls.polarAngle = Math.max(0.1, Math.min(Math.PI - 0.1, this.orbitControls.polarAngle));
             
             this.orbitControls.update();
