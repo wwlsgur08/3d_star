@@ -354,14 +354,45 @@ class HandTrackingManager {
         
         // 움직임이 있을 때만 회전
         if (Math.abs(deltaX) > 0.001 || Math.abs(deltaY) > 0.001) {
-            this.orbitControls.azimuthalAngle -= deltaX; // 좌우 회전
-            this.orbitControls.polarAngle += deltaY;     // 상하 회전
+            // Three.js 카메라를 직접 조작
+            const camera = this.orbitControls.object;
+            const target = this.orbitControls.target;
+            
+            // 현재 카메라 위치를 구면 좌표로 변환
+            const position = camera.position.clone().sub(target);
+            const radius = position.length();
+            
+            // 현재 각도 계산
+            let theta = Math.atan2(position.x, position.z); // 좌우 회전각
+            let phi = Math.acos(position.y / radius);       // 상하 회전각
+            
+            // 손 움직임을 각도 변화로 적용
+            theta -= deltaX;
+            phi += deltaY;
             
             // 상하 각도 제한
-            this.orbitControls.polarAngle = Math.max(0.1, Math.min(Math.PI - 0.1, this.orbitControls.polarAngle));
+            phi = Math.max(0.1, Math.min(Math.PI - 0.1, phi));
             
-            this.orbitControls.update();
+            // 새로운 카메라 위치 계산
+            const newX = radius * Math.sin(phi) * Math.sin(theta);
+            const newY = radius * Math.cos(phi);
+            const newZ = radius * Math.sin(phi) * Math.cos(theta);
+            
+            // 카메라 위치 업데이트
+            camera.position.copy(target).add(new THREE.Vector3(newX, newY, newZ));
+            camera.lookAt(target);
+            
             this.setGesture('ROTATE');
+            
+            // 강제로 렌더링 업데이트 (필요한 경우)
+            if (this.orbitControls.update) {
+                this.orbitControls.update();
+            }
+            
+            console.log('🌍 카메라 회전!', {
+                deltaX: deltaX.toFixed(3),
+                deltaY: deltaY.toFixed(3)
+            });
         } else {
             this.setGesture('HAND');
         }
