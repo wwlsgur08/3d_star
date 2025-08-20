@@ -64,6 +64,9 @@ class HandTrackingManager {
         console.log('2️⃣ MediaPipe 설정 중...');  
         await this.setupMediaPipe();
         
+        console.log('3️⃣ 카메라 시작 중...');
+        await this.startCamera();
+        
         console.log('✅ Hand Tracking Manager 초기화 완료');
     }
     
@@ -86,38 +89,12 @@ class HandTrackingManager {
             
             console.log('✅ 카메라 스트림 연결 완료');
             
-            // 비디오가 완전히 로드되면 실행
+            // 비디오가 완전히 로드될 때까지 대기
             return new Promise((resolve) => {
                 this.videoElement.addEventListener('loadeddata', () => {
                     console.log('📹 비디오 스트림 준비 완료');
                     console.log('📏 비디오 크기:', this.videoElement.videoWidth, 'x', this.videoElement.videoHeight);
-                    
-                    // MediaPipe 설정이 완료될 때까지 대기
-                    setTimeout(async () => {
-                        if (this.camera) {
-                            console.log('▶️ MediaPipe 카메라 시작 시도...');
-                            try {
-                                await this.camera.start();
-                                console.log('✅ MediaPipe 카메라 시작 성공!');
-                                
-                                // 카메라가 정말 작동하는지 테스트
-                                setTimeout(() => {
-                                    console.log('🔄 강제 테스트 프레임 전송...');
-                                    if (this.hands && this.videoElement.readyState === 4) {
-                                        this.hands.send({image: this.videoElement})
-                                            .then(() => console.log('✅ 강제 프레임 전송 성공'))
-                                            .catch(err => console.error('❌ 강제 프레임 전송 실패:', err));
-                                    }
-                                }, 2000);
-                                
-                            } catch (error) {
-                                console.error('❌ MediaPipe 카메라 시작 실패:', error);
-                            }
-                        } else {
-                            console.error('❌ 카메라 객체가 없습니다!');
-                        }
-                        resolve();
-                    }, 1000); // 1초 대기
+                    resolve();
                 });
             });
             
@@ -203,6 +180,33 @@ class HandTrackingManager {
             console.error('❌ MediaPipe 설정 실패:', error);
             this.updateStatus('camera-status', 'ERROR');
             this.fallbackMode();
+        }
+    }
+    
+    // 카메라 시작 함수
+    async startCamera() {
+        if (!this.camera) {
+            console.error('❌ 카메라 객체가 없습니다!');
+            return;
+        }
+        
+        console.log('▶️ MediaPipe 카메라 시작 시도...');
+        try {
+            await this.camera.start();
+            console.log('✅ MediaPipe 카메라 시작 성공!');
+            
+            // 3초 후 강제 테스트
+            setTimeout(() => {
+                console.log('🔄 강제 테스트 프레임 전송...');
+                if (this.hands && this.videoElement.readyState === 4) {
+                    this.hands.send({image: this.videoElement})
+                        .then(() => console.log('✅ 강제 프레임 전송 성공'))
+                        .catch(err => console.error('❌ 강제 프레임 전송 실패:', err));
+                }
+            }, 3000);
+            
+        } catch (error) {
+            console.error('❌ MediaPipe 카메라 시작 실패:', error);
         }
     }
     
