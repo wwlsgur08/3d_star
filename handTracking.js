@@ -30,6 +30,13 @@ class HandTrackingManager {
     async init() {
         console.log('🤚 Hand Tracking Manager 초기화 시작');
         
+        // MediaPipe 라이브러리 상태 확인
+        console.log('🔍 MediaPipe 라이브러리 상태 확인...');
+        console.log('- window.Hands:', !!window.Hands);
+        console.log('- window.Camera:', !!window.Camera);
+        console.log('- window.drawConnectors:', !!window.drawConnectors);
+        console.log('- window.drawLandmarks:', !!window.drawLandmarks);
+        
         // UI 요소들 가져오기
         this.videoElement = document.getElementById('webcam-video');
         this.canvasElement = document.getElementById('hand-overlay');
@@ -39,11 +46,16 @@ class HandTrackingManager {
             return;
         }
         
+        console.log('✅ UI 요소 확인 완료');
+        console.log('- 비디오 요소:', this.videoElement);
+        console.log('- 캔버스 요소:', this.canvasElement);
+        
         this.canvasCtx = this.canvasElement.getContext('2d');
         
         // 캔버스 크기 설정
         this.canvasElement.width = 160;
         this.canvasElement.height = 120;
+        console.log('✅ 캔버스 크기 설정 완료: 160x120');
         
         // 단계별 초기화
         console.log('1️⃣ 카메라 설정 중...');
@@ -147,10 +159,24 @@ class HandTrackingManager {
     }
     
     onResults(results) {
+        // 프레임 처리 로그 (매우 자주 호출되므로 조건부로)
+        if (Math.random() < 0.01) { // 1% 확률로만 로그
+            console.log('📡 MediaPipe 프레임 처리 중...', {
+                hasResults: !!results,
+                hasMultiHandLandmarks: !!results.multiHandLandmarks,
+                handCount: results.multiHandLandmarks ? results.multiHandLandmarks.length : 0
+            });
+        }
+        
         // 캔버스 초기화
         this.canvasCtx.clearRect(0, 0, this.canvasElement.width, this.canvasElement.height);
         
         if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+            // 처음 손이 감지되면 로그
+            if (this.handLandmarks === null) {
+                console.log('👋 손 감지됨!', results.multiHandLandmarks.length, '개');
+            }
+            
             this.handLandmarks = results.multiHandLandmarks;
             this.updateStatus('hands-status', `${results.multiHandLandmarks.length}`, 'active');
             
@@ -161,6 +187,11 @@ class HandTrackingManager {
             this.recognizeGestures(results);
             
         } else {
+            // 손이 사라지면 로그
+            if (this.handLandmarks !== null) {
+                console.log('👋 손 감지 종료');
+            }
+            
             this.handLandmarks = null;
             this.updateStatus('hands-status', 'NONE');
             this.setGesture('IDLE');
