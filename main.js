@@ -6,6 +6,7 @@ import { gsap } from 'gsap';
 let socket = null;
 let currentNewestStar = null; // 가장 최근 별 (후광 표시용)
 let currentHalo = null; // 현재 후광 객체
+let handTracker = null; // 손 추적 매니저
 
 // 인트로 화면 제어 함수
 window.startExploration = function() {
@@ -512,6 +513,15 @@ controls.minDistance = 0.5; // 확대 가능
 controls.maxDistance = 3; // 초기 시점보다 축소 불가 (확대만 가능)
 controls.target.set(0, 0, 0);
 controls.enablePan = false;
+
+// 손 추적 초기화 (OrbitControls 설정 후)
+setTimeout(() => {
+    if (window.HandTrackingManager) {
+        handTracker = new window.HandTrackingManager();
+        handTracker.setOrbitControls(controls);
+        console.log('🤚 손 추적 기능 활성화');
+    }
+}, 2000); // 2초 후 초기화 (인트로 후)
 
 // 자동 회전 시스템 변수
 let autoRotate = true; // 자동 회전 상태
