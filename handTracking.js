@@ -361,12 +361,17 @@ class HandTrackingManager {
             const distanceChange = handDistance - this.lastTwoHandDistance;
             
             if (Math.abs(distanceChange) > 0.02) {
-                if (distanceChange > 0) {
-                    this.setGesture('ZOOM_OUT');
-                    this.handleZoomGesture(distanceChange);
-                } else {
-                    this.setGesture('ZOOM_IN');
-                    this.handleZoomGesture(distanceChange);
+                try {
+                    if (distanceChange > 0) {
+                        this.setGesture('ZOOM_OUT');
+                        this.handleZoomGesture(distanceChange);
+                    } else {
+                        this.setGesture('ZOOM_IN');
+                        this.handleZoomGesture(distanceChange);
+                    }
+                } catch (error) {
+                    console.warn('줌 제스처 스킵:', error.message);
+                    this.setGesture('ZOOM_DISABLED');
                 }
             }
         }
