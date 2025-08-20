@@ -25,6 +25,15 @@ class HandTrackingManager {
         this.smoothingFactor = 0.3;    // 스무딩 강도 (0~1, 낮을수록 부드러움)
         this.sensitivity = 2;          // 회전 감도 (낮춤)
         
+        // 양손 구분 및 커서
+        this.rightHandHistory = [];
+        this.leftHandHistory = [];
+        this.cursorPosition = { x: 0.5, y: 0.5 };
+        
+        // 포인팅 탭 감지용
+        this.lastPointingTime = null;
+        this.pointingDuration = 0;
+        
         this.init();
     }
     
@@ -308,12 +317,126 @@ class HandTrackingManager {
     
     recognizeGestures(results) {
         const hands = results.multiHandLandmarks;
+        const handedness = results.multiHandedness;
         
-        if (hands.length >= 1) {
-            // 첫 번째 손만 사용해서 스와이프 회전
-            this.analyzeSingleHand(hands[0]);
-        } else {
+        if (hands.length === 0) {
             this.setGesture('IDLE');
+            return;
+        }
+        
+        // 양손 구분 처리
+        for (let i = 0; i < hands.length; i++) {
+            const hand = hands[i];
+            const isRightHand = handedness && handedness[i] && 
+                               handedness[i].label === 'Right';
+            
+            if (isRightHand) {
+                // 오른손 - 회전 담당
+                this.handleRightHand(hand);
+            } else {
+                // 왼손 - 커서 담당
+                this.handleLeftHand(hand);
+            }
+        }
+    }
+
+    // 오른손 처리 - 회전 담당
+    handleRightHand(hand) {
+        // 주먹 인식으로 회전 중지
+        if (this.isFist(hand)) {
+            this.setGesture('FIST_RIGHT');
+            return; // 주먹일 때는 회전 중지
+        }
+        
+        // 검지 끝점으로 스와이프 회전 처리
+        const indexTip = hand[8];
+        this.handleSwipeGesture(indexTip);
+    }
+
+    // 왼손 처리 - 커서 담당  
+    handleLeftHand(hand) {
+        // 검지 끝점으로 커서 위치 업데이트
+        const indexTip = hand[8];
+        
+        // 커서 위치 업데이트 (좌우 반전 적용)
+        this.cursorPosition = {
+            x: 1.0 - indexTip.x, // 좌우 반전
+            y: indexTip.y
+        };
+        
+        // 검지로 포인팅하는지 검사
+        if (this.isPointing(hand)) {
+            this.setGesture('POINT_LEFT');
+            this.showCursor(this.cursorPosition);
+            
+            // 포인팅 상태로 일정 시간 유지되면 더블탭으로 간주
+            this.detectPointingTap();
+        } else if (this.isFist(hand)) {
+            this.setGesture('FIST_LEFT');
+        } else {
+            this.setGesture('HAND_LEFT');
+            this.showCursor(this.cursorPosition);
+        }
+    }
+
+    // 주먹 인식
+    isFist(hand) {
+        // 모든 손가락 끝점이 손바닥보다 아래 있으면 주먹
+        const thumbTip = hand[4];
+        const indexTip = hand[8];
+        const middleTip = hand[12];
+        const ringTip = hand[16];
+        const pinkyTip = hand[20];
+        const wrist = hand[0];
+        
+        // 손가락 끝점들이 손목보다 y축으로 위쪽에 있는지 확인 (펴진 상태)
+        const extendedFingers = [
+            indexTip.y < wrist.y,
+            middleTip.y < wrist.y,
+            ringTip.y < wrist.y,
+            pinkyTip.y < wrist.y
+        ].filter(extended => extended).length;
+        
+        // 2개 이하의 손가락만 펴져있으면 주먹으로 간주
+        return extendedFingers <= 2;
+    }
+
+    // 포인팅 제스처 인식 (검지만 펴짐)
+    isPointing(hand) {
+        const indexTip = hand[8];
+        const indexPip = hand[6];
+        const middleTip = hand[12];
+        const middlePip = hand[10];
+        const ringTip = hand[16];
+        const ringPip = hand[14];
+        const pinkyTip = hand[20];
+        const pinkyPip = hand[18];
+        
+        // 검지는 펴져있고 나머지 손가락은 구부러져있음
+        const indexExtended = indexTip.y < indexPip.y;
+        const middleFolded = middleTip.y > middlePip.y;
+        const ringFolded = ringTip.y > ringPip.y;
+        const pinkyFolded = pinkyTip.y > pinkyPip.y;
+        
+        return indexExtended && middleFolded && ringFolded && pinkyFolded;
+    }
+
+    // 포인팅 상태에서 탭 감지
+    detectPointingTap() {
+        const now = Date.now();
+        
+        if (!this.lastPointingTime) {
+            this.lastPointingTime = now;
+            this.pointingDuration = 0;
+        } else {
+            this.pointingDuration = now - this.lastPointingTime;
+        }
+        
+        // 1초간 포인팅 유지하면 더블클릭으로 간주
+        if (this.pointingDuration > 1000) {
+            this.handleDoubleClick();
+            this.lastPointingTime = null;
+            this.pointingDuration = 0;
         }
     }
     
