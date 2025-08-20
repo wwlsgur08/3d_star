@@ -395,17 +395,28 @@ class HandTrackingManager {
     handleZoomGesture(distanceChange) {
         if (!this.orbitControls) return;
         
-        const zoomFactor = distanceChange * 5; // 줌 감도 조정
+        const zoomFactor = distanceChange * 0.1; // 줌 감도 조정
         
-        if (distanceChange > 0) {
-            // 손을 벌릴 때 - 확대
-            this.orbitControls.dollyOut(1 - zoomFactor);
-        } else {
-            // 손을 모을 때 - 축소
-            this.orbitControls.dollyIn(1 + Math.abs(zoomFactor));
+        try {
+            // Three.js 카메라 위치를 직접 조정
+            const camera = this.orbitControls.object;
+            const target = this.orbitControls.target;
+            
+            // 카메라에서 타겟으로의 방향벡터
+            const direction = camera.position.clone().sub(target).normalize();
+            const currentDistance = camera.position.distanceTo(target);
+            
+            // 새로운 거리 계산
+            const newDistance = Math.max(0.5, Math.min(10, currentDistance + zoomFactor));
+            
+            // 카메라 위치 업데이트
+            camera.position.copy(target).add(direction.multiplyScalar(newDistance));
+            
+            this.orbitControls.update();
+            
+        } catch (error) {
+            console.warn('줌 제스처 처리 중 오류:', error);
         }
-        
-        this.orbitControls.update();
     }
     
     isFingerExtended(hand, tipIndex) {
