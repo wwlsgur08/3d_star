@@ -378,8 +378,8 @@ class HandTrackingManager {
             const newY = radius * Math.cos(phi);
             const newZ = radius * Math.sin(phi) * Math.cos(theta);
             
-            // 카메라 위치 업데이트
-            camera.position.copy(target).add(new THREE.Vector3(newX, newY, newZ));
+            // 카메라 위치 업데이트 (THREE 없이)
+            camera.position.set(target.x + newX, target.y + newY, target.z + newZ);
             camera.lookAt(target);
             
             this.setGesture('ROTATE');
